@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Apple Journal Clone",
+    "slug": "apple-journal-clone",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "apple-journal-clone",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourname.applejournalclone"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#000000"
+      },
+      "package": "com.yourname.applejournalclone"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
+
