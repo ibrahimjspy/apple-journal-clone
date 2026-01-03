@@ -6,6 +6,10 @@
 ![Framework](https://img.shields.io/badge/framework-Expo%20React%20Native-blue)
 ![License](https://img.shields.io/badge/license-MIT-purple)
 
+<p align="center">
+  <img src="public/demo/demo1.png" alt="Apple Journal Clone Demo" width="300" />
+</p>
+
 ---
 
 ## 🎯 Why This Exists
