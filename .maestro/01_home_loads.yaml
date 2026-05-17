@@ -1,0 +1,7 @@
+appId: com.yourname.applejournalclone
+name: Home screen loads with empty state
+---
+- launchApp
+- assertVisible: "Journal"
+- assertVisible: "Start Journaling"
+- assertVisible: "Tap the plus button to get started"

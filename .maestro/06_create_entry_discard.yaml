@@ -1,0 +1,32 @@
+appId: com.yourname.applejournalclone
+name: Discard entry with unsaved changes shows confirmation
+---
+- launchApp
+- assertVisible: "Journal"
+
+# Open create sheet via FAB
+- tapOn:
+    id: "create-entry-fab"
+- extendedWaitUntil:
+    visible: "Done"
+    timeout: 5000
+
+# Type some content
+- tapOn: "Start writing..."
+- inputText: "This will be discarded"
+
+# Try to close (tap the bookmark/close button on the left)
+- tapOn:
+    point: "10%,18%"
+
+# Discard confirmation should appear
+- extendedWaitUntil:
+    visible: "Discard Entry?"
+    timeout: 3000
+- assertVisible: "You have unsaved changes"
+
+# Choose to discard
+- tapOn: "Discard"
+
+# Should be back on home, entry should not exist
+- assertNotVisible: "This will be discarded"

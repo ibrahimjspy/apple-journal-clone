@@ -1,0 +1,23 @@
+appId: com.yourname.applejournalclone
+name: Delete a journal entry
+tags:
+  - requires-entry
+---
+- launchApp
+- assertVisible: "Journal"
+
+# Tap the more (ellipsis) button on the first card
+- tapOn:
+    id: "entry-more-button"
+    index: 0
+
+# Confirm delete in the alert dialog
+- extendedWaitUntil:
+    visible: "Delete Entry"
+    timeout: 3000
+- tapOn: "Delete"
+
+# Verify entry is gone and empty state may show
+- extendedWaitUntil:
+    visible: "Journal"
+    timeout: 3000

@@ -77,6 +77,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Journal</Text>
           <Pressable 
+            testID="filter-button"
             style={styles.filterButton}
             onPress={() => setShowFilters(prev => !prev)}
           >
@@ -142,6 +143,7 @@ export default function HomeScreen() {
               pressed && styles.fabPressed
             ]}
             onPress={() => setShowCreateSheet(true)}
+            testID="create-entry-fab"
           >
             <LinearGradient
               colors={[colors.fabGradientStart, colors.fabGradientEnd]}
@@ -275,7 +277,7 @@ function JournalCard({ entry, onPress, onDelete }: { entry: JournalEntry; onPres
       {/* Footer */}
       <View style={styles.cardFooter}>
         <Text style={styles.cardDate}>{formatDate(entry.createdAt)}</Text>
-        <Pressable style={styles.moreButton} onPress={handleMorePress}>
+        <Pressable testID="entry-more-button" style={styles.moreButton} onPress={handleMorePress}>
           <Icon name="ellipsis-horizontal" size={IconSize.sm} color={colors.textTertiary} />
         </Pressable>
       </View>

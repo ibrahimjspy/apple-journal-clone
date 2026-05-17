@@ -1,0 +1,41 @@
+appId: com.yourname.applejournalclone
+name: View and edit an existing entry
+tags:
+  - requires-entry
+---
+- launchApp
+- assertVisible: "Journal"
+
+# Tap on the first entry card to open it
+- tapOn: "My First Entry"
+
+# Wait for view sheet
+- extendedWaitUntil:
+    visible: "Edit"
+    timeout: 3000
+
+# Verify content is shown
+- assertVisible: "My First Entry"
+- assertVisible: "Today I started building"
+
+# Switch to edit mode
+- tapOn: "Edit"
+- extendedWaitUntil:
+    visible: "Done"
+    timeout: 2000
+
+# Edit the title
+- tapOn: "My First Entry"
+- clearText
+- inputText: "Updated Entry"
+
+# Save changes
+- tapOn: "Done"
+
+# Close the sheet by tapping backdrop or waiting
+- back
+
+# Verify updated title on home
+- extendedWaitUntil:
+    visible: "Updated Entry"
+    timeout: 3000

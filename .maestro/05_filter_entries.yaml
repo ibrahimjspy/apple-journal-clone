@@ -1,0 +1,43 @@
+appId: com.yourname.applejournalclone
+name: Filter entries by type
+tags:
+  - requires-entries
+---
+- launchApp
+- assertVisible: "Journal"
+
+# First create a text entry so we have something to filter
+- tapOn:
+    id: "create-entry-fab"
+- extendedWaitUntil:
+    visible: "Done"
+    timeout: 5000
+- tapOn: "Title (optional)"
+- inputText: "Text Only Entry"
+- tapOn: "Start writing..."
+- inputText: "Just some text content"
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible: "Text Only Entry"
+    timeout: 3000
+
+# Open filter bar
+- tapOn:
+    id: "filter-button"
+
+# Filter pills should appear
+- extendedWaitUntil:
+    visible: "All"
+    timeout: 2000
+- assertVisible: "With Photos"
+- assertVisible: "With Audio"
+
+# Tap "With Photos" — text entry should disappear
+- tapOn: "With Photos"
+- assertNotVisible: "Text Only Entry"
+
+# Tap "All" — entry should reappear
+- tapOn: "All"
+- extendedWaitUntil:
+    visible: "Text Only Entry"
+    timeout: 2000

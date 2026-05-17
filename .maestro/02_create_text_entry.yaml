@@ -1,0 +1,32 @@
+appId: com.yourname.applejournalclone
+name: Create a text-only journal entry with title
+---
+- launchApp
+- assertVisible: "Journal"
+
+# Open create sheet via FAB
+- tapOn:
+    id: "create-entry-fab"
+
+# Wait for bottom sheet to appear
+- extendedWaitUntil:
+    visible: "Done"
+    timeout: 5000
+
+# Type title
+- tapOn: "Title (optional)"
+- inputText: "My First Entry"
+
+# Type body text
+- tapOn: "Start writing..."
+- inputText: "Today I started building my journal app. It feels great to finally have a place to write."
+
+# Save
+- tapOn: "Done"
+
+# Verify entry appears on home
+- extendedWaitUntil:
+    visible: "My First Entry"
+    timeout: 3000
+- assertVisible: "Today I started building"
+- assertVisible: "Today"
