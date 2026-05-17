@@ -1,22 +1,22 @@
 /**
  * Local Storage Service using AsyncStorage
- * This will be the foundation before Google Drive sync
+ * Handles journal entry CRUD with metadata stored in AsyncStorage.
+ * Media files (images, audio) are persisted separately via services/media.ts.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { JournalEntry, JournalEntryDraft, ContentBlock } from '@/types/journal';
+import { generateId } from '@/utils/id';
+import { deleteMediaFile } from './media';
+
+export { generateId };
 
 const STORAGE_KEYS = {
   ENTRIES: 'journal_entries',
   DRAFT: 'journal_draft',
 } as const;
 
-// Generate unique ID
-export function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-// Get all journal entries
+/** Retrieves all entries from AsyncStorage, sorted newest-first. Returns [] on failure. */
 export async function getEntries(): Promise<JournalEntry[]> {
   try {
     const data = await AsyncStorage.getItem(STORAGE_KEYS.ENTRIES);
@@ -33,43 +33,36 @@ export async function getEntries(): Promise<JournalEntry[]> {
   }
 }
 
-// Get a single entry by ID
-export async function getEntry(id: string): Promise<JournalEntry | null> {
+/** Persists a new entry, computes preview fields, and clears any saved draft. Throws on failure. */
+export async function createEntry(draft: JournalEntryDraft): Promise<JournalEntry> {
   try {
+    const now = new Date().toISOString();
+    
+    const entry: JournalEntry = {
+      ...draft,
+      id: generateId(),
+      createdAt: now,
+      updatedAt: now,
+      previewText: extractPreviewText(draft.content),
+      previewImages: extractPreviewImages(draft.content),
+      hasAudio: draft.content.some(block => block.type === 'audio'),
+    };
+
     const entries = await getEntries();
-    return entries.find(e => e.id === id) || null;
+    entries.unshift(entry);
+    
+    await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
+    
+    await clearDraft();
+    
+    return entry;
   } catch (error) {
-    console.error('Error getting entry:', error);
-    return null;
+    console.error('Error creating entry:', error);
+    throw error;
   }
 }
 
-// Create a new journal entry
-export async function createEntry(draft: JournalEntryDraft): Promise<JournalEntry> {
-  const now = new Date().toISOString();
-  
-  const entry: JournalEntry = {
-    ...draft,
-    id: generateId(),
-    createdAt: now,
-    updatedAt: now,
-    previewText: extractPreviewText(draft.content),
-    previewImages: extractPreviewImages(draft.content),
-    hasAudio: draft.content.some(block => block.type === 'audio'),
-  };
-
-  const entries = await getEntries();
-  entries.unshift(entry);
-  
-  await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
-  
-  // Clear draft after saving
-  await clearDraft();
-  
-  return entry;
-}
-
-// Update an existing entry
+/** Applies partial updates to an entry. Recomputes previews if content changed. Returns null if not found. */
 export async function updateEntry(id: string, updates: Partial<JournalEntryDraft>): Promise<JournalEntry | null> {
   try {
     const entries = await getEntries();
@@ -100,10 +93,21 @@ export async function updateEntry(id: string, updates: Partial<JournalEntryDraft
   }
 }
 
-// Delete an entry
+/** Deletes an entry and its associated media files from local storage. */
 export async function deleteEntry(id: string): Promise<boolean> {
   try {
     const entries = await getEntries();
+    const entry = entries.find(e => e.id === id);
+    
+    if (entry) {
+      const mediaUris: string[] = [];
+      for (const block of entry.content) {
+        if (block.type === 'image' && block.content) mediaUris.push(block.content);
+        if (block.type === 'audio' && block.content) mediaUris.push(block.content);
+      }
+      await Promise.all(mediaUris.map(uri => deleteMediaFile(uri)));
+    }
+    
     const filtered = entries.filter(e => e.id !== id);
     await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(filtered));
     return true;
@@ -113,28 +117,7 @@ export async function deleteEntry(id: string): Promise<boolean> {
   }
 }
 
-// Save draft (auto-save while editing)
-export async function saveDraft(draft: JournalEntryDraft): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEYS.DRAFT, JSON.stringify(draft));
-  } catch (error) {
-    console.error('Error saving draft:', error);
-  }
-}
-
-// Get draft
-export async function getDraft(): Promise<JournalEntryDraft | null> {
-  try {
-    const data = await AsyncStorage.getItem(STORAGE_KEYS.DRAFT);
-    return data ? JSON.parse(data) : null;
-  } catch (error) {
-    console.error('Error getting draft:', error);
-    return null;
-  }
-}
-
-// Clear draft
-export async function clearDraft(): Promise<void> {
+async function clearDraft(): Promise<void> {
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.DRAFT);
   } catch (error) {
@@ -157,7 +140,7 @@ function extractPreviewImages(content: ContentBlock[]): string[] {
     .slice(0, 6); // Max 6 preview images
 }
 
-// Format date for display
+/** Formats an ISO date string for display: "Today", "Yesterday", weekday, or "Weekday, Mon DD". */
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();

@@ -54,6 +54,7 @@ export function ContentBlockRenderer({
           source={{ uri: block.content }} 
           style={styles.image}
           resizeMode="cover"
+          onError={() => console.warn('Failed to load image:', block.content)}
         />
         {isEditing && onRemove && (
           <Pressable 
@@ -67,7 +68,24 @@ export function ContentBlockRenderer({
     );
   }
 
-  if (block.type === 'audio' && block.audioData) {
+  if (block.type === 'audio') {
+    if (!block.audioData) {
+      return (
+        <View style={styles.audioFallback}>
+          <Icon name="alert-circle-outline" size={IconSize.sm} color={colors.textTertiary} />
+          <Text style={styles.audioFallbackText}>Audio unavailable</Text>
+          {isEditing && onRemove && (
+            <Pressable 
+              style={styles.removeAudioButton}
+              onPress={() => onRemove(block.id)}
+            >
+              <Icon name="close-circle" size={IconSize.sm} color={colors.textTertiary} />
+            </Pressable>
+          )}
+        </View>
+      );
+    }
+
     return (
       <View style={styles.audioContainer}>
         {useCompactAudio ? (
@@ -134,6 +152,20 @@ const styles = StyleSheet.create({
   },
   removeAudioButton: {
     padding: spacing.xs,
+  },
+  audioFallback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+  },
+  audioFallbackText: {
+    flex: 1,
+    fontSize: typography.sizes.sm,
+    color: colors.textTertiary,
   },
 });
 

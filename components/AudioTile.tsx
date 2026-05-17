@@ -5,11 +5,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
-import { Audio } from 'expo-av';
+import { Audio, AVPlaybackStatus } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
 import { AudioEntry } from '@/types/journal';
+import { formatDurationMs } from '@/utils/time';
 
 interface AudioTileProps {
   audio: AudioEntry;
@@ -52,8 +53,13 @@ export function AudioTile({ audio }: AudioTileProps) {
           ])
         );
       });
-      
-      Animated.parallel(animations).start();
+
+      const composite = Animated.parallel(animations);
+      composite.start();
+
+      return () => {
+        composite.stop();
+      };
     } else {
       barAnimations.forEach(anim => {
         anim.stopAnimation();
@@ -90,22 +96,17 @@ export function AudioTile({ audio }: AudioTileProps) {
     }
   };
 
-  const onPlaybackStatusUpdate = (status: any) => {
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
-      setProgress(status.positionMillis / status.durationMillis);
+      const dur = status.durationMillis || 1;
+      const prog = status.positionMillis / dur;
+      setProgress(isFinite(prog) ? prog : 0);
       
       if (status.didJustFinish) {
         setIsPlaying(false);
         setProgress(0);
       }
     }
-  };
-
-  const formatDuration = (ms: number): string => {
-    const totalSecs = Math.floor(ms / 1000);
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const waveformBars = audio.waveform?.slice(0, 30) || new Array(30).fill(0.5);
@@ -152,7 +153,7 @@ export function AudioTile({ audio }: AudioTileProps) {
         </View>
 
         {/* Duration */}
-        <Text style={styles.duration}>{formatDuration(audio.duration)}</Text>
+        <Text style={styles.duration}>{formatDurationMs(audio.duration)}</Text>
       </LinearGradient>
     </Pressable>
   );

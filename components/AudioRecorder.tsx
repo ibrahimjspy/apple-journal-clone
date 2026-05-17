@@ -4,12 +4,14 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
-import { generateId } from '@/services/storage';
+import { generateId } from '@/utils/id';
+import { formatDurationSecs } from '@/utils/time';
+import { showAlert } from '@/utils/alert';
 import { AudioEntry } from '@/types/journal';
 
 const NUM_BARS = 32; // Fewer bars for better visibility on mobile
@@ -27,74 +29,14 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
   const [waveformData, setWaveformData] = useState<number[]>(new Array(NUM_BARS).fill(0.1));
   
   const recordingRef = useRef<Audio.Recording | null>(null);
-  const meteringInterval = useRef<NodeJS.Timeout | null>(null);
-  const durationInterval = useRef<NodeJS.Timeout | null>(null);
+  const meteringInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const waveformHistory = useRef<number[]>([]);
   
   // Animated values for each bar
   const barAnimations = useRef<Animated.Value[]>(
     new Array(NUM_BARS).fill(0).map(() => new Animated.Value(0.1))
   ).current;
-
-  // Start recording
-  const startRecording = useCallback(async () => {
-    try {
-      // Request permissions
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.error('Audio permission not granted');
-        return;
-      }
-
-      // Configure audio mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      // Create and start recording with metering enabled
-      const { recording } = await Audio.Recording.createAsync(
-        {
-          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-          isMeteringEnabled: true,
-        }
-      );
-
-      recordingRef.current = recording;
-      setIsRecording(true);
-      setIsPaused(false);
-      waveformHistory.current = [];
-
-      // Start metering updates
-      meteringInterval.current = setInterval(async () => {
-        if (recordingRef.current) {
-          try {
-            const status = await recordingRef.current.getStatusAsync();
-            if (status.isRecording) {
-              // Metering ranges from about -160 (silence) to 0 (max)
-              // Normal speech is around -30 to -10 dB
-              // Adjusted for better sensitivity to voice
-              const metering = status.metering ?? -160;
-              const minDb = -50; // Quieter sounds still register
-              const maxDb = -5;  // Loud sounds
-              const normalizedLevel = Math.max(0, Math.min(1, (metering - minDb) / (maxDb - minDb)));
-              updateWaveform(normalizedLevel);
-            }
-          } catch (e) {
-            // Ignore status errors during recording
-          }
-        }
-      }, UPDATE_INTERVAL);
-
-      // Start duration counter
-      durationInterval.current = setInterval(() => {
-        setDuration(prev => prev + 1);
-      }, 1000);
-
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-    }
-  }, []);
 
   // Update waveform with new metering value
   const updateWaveform = useCallback((level: number) => {
@@ -121,6 +63,93 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
       return newData;
     });
   }, [barAnimations]);
+
+  const startTimers = useCallback(() => {
+    if (meteringInterval.current) clearInterval(meteringInterval.current);
+    if (durationInterval.current) clearInterval(durationInterval.current);
+
+    meteringInterval.current = setInterval(async () => {
+      if (recordingRef.current) {
+        try {
+          const status = await recordingRef.current.getStatusAsync();
+          if (status.isRecording) {
+            const metering = status.metering ?? -160;
+            const minDb = -50;
+            const maxDb = -5;
+            const normalizedLevel = Math.max(0, Math.min(1, (metering - minDb) / (maxDb - minDb)));
+            updateWaveform(normalizedLevel);
+          }
+        } catch (e) {
+          // Ignore status errors during recording
+        }
+      }
+    }, UPDATE_INTERVAL);
+
+    durationInterval.current = setInterval(() => {
+      setDuration(prev => prev + 1);
+    }, 1000);
+  }, [updateWaveform]);
+
+  const pauseTimers = useCallback(() => {
+    if (meteringInterval.current) clearInterval(meteringInterval.current);
+    if (durationInterval.current) clearInterval(durationInterval.current);
+    meteringInterval.current = null;
+    durationInterval.current = null;
+  }, []);
+
+  // Start recording
+  const startRecording = useCallback(async () => {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert('Permission needed', 'Please grant microphone access to record voice notes.');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        {
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          isMeteringEnabled: true,
+        }
+      );
+
+      recordingRef.current = recording;
+      setIsRecording(true);
+      setIsPaused(false);
+      waveformHistory.current = [];
+
+      startTimers();
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+    }
+  }, [startTimers]);
+
+  const pauseRecording = useCallback(async () => {
+    if (!recordingRef.current) return;
+    try {
+      await recordingRef.current.pauseAsync();
+      pauseTimers();
+      setIsPaused(true);
+    } catch (error) {
+      console.error('Failed to pause recording:', error);
+    }
+  }, [pauseTimers]);
+
+  const resumeRecording = useCallback(async () => {
+    if (!recordingRef.current) return;
+    try {
+      await recordingRef.current.startAsync();
+      startTimers();
+      setIsPaused(false);
+    } catch (error) {
+      console.error('Failed to resume recording:', error);
+    }
+  }, [startTimers]);
 
   // Stop recording
   const stopRecording = useCallback(async () => {
@@ -193,13 +222,6 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
     };
   }, []);
 
-  // Format duration as MM:SS
-  const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -208,7 +230,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
           <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
         <Text style={styles.title}>
-          {isRecording ? 'Recording' : 'Voice Note'}
+          {!isRecording ? 'Voice Note' : isPaused ? 'Paused' : 'Recording'}
         </Text>
         <View style={styles.cancelButton} />
       </View>
@@ -239,12 +261,11 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
       </View>
 
       {/* Duration */}
-      <Text style={styles.duration}>{formatDuration(duration)}</Text>
+      <Text style={styles.duration}>{formatDurationSecs(duration)}</Text>
 
       {/* Controls */}
       <View style={styles.controls}>
         {!isRecording ? (
-          // Start button
           <Pressable 
             onPress={startRecording}
             style={({ pressed }) => [
@@ -260,29 +281,46 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
             </LinearGradient>
           </Pressable>
         ) : (
-          // Stop button
-          <Pressable 
-            onPress={stopRecording}
-            style={({ pressed }) => [
-              styles.stopButton,
-              pressed && styles.buttonPressed
-            ]}
-          >
-            <LinearGradient
-              colors={[colors.fabGradientStart, colors.fabGradientEnd]}
-              style={styles.stopButtonGradient}
+          <View style={styles.recordingControls}>
+            <Pressable 
+              onPress={isPaused ? resumeRecording : pauseRecording}
+              style={({ pressed }) => [
+                styles.pauseButton,
+                pressed && styles.buttonPressed
+              ]}
             >
-              <Icon name="stop" size={IconSize.lg} color={colors.textPrimary} />
-            </LinearGradient>
-          </Pressable>
+              <Icon 
+                name={isPaused ? 'mic' : 'pause'} 
+                size={IconSize.lg} 
+                color={colors.textPrimary} 
+              />
+            </Pressable>
+
+            <Pressable 
+              onPress={stopRecording}
+              style={({ pressed }) => [
+                styles.stopButton,
+                pressed && styles.buttonPressed
+              ]}
+            >
+              <LinearGradient
+                colors={[colors.fabGradientStart, colors.fabGradientEnd]}
+                style={styles.stopButtonGradient}
+              >
+                <Icon name="checkmark" size={IconSize.lg} color={colors.textPrimary} />
+              </LinearGradient>
+            </Pressable>
+          </View>
         )}
       </View>
 
       {/* Hint text */}
       <Text style={styles.hint}>
-        {isRecording 
-          ? 'Tap stop when finished' 
-          : 'Tap to start recording'}
+        {!isRecording 
+          ? 'Tap to start recording'
+          : isPaused
+            ? 'Paused — tap mic to resume'
+            : 'Tap pause or finish when done'}
       </Text>
     </View>
   );
@@ -386,6 +424,19 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     backgroundColor: colors.textPrimary,
+  },
+  recordingControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xl,
+  },
+  pauseButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   stopButton: {
     width: 72,

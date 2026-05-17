@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { 
   View, 
   Text, 
+  TextInput,
   StyleSheet, 
   ScrollView, 
   Pressable,
@@ -35,6 +36,7 @@ interface ViewEntrySheetProps {
 export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }: ViewEntrySheetProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [entryTitle, setEntryTitle] = useState(entry?.title || '');
   
   const {
     contentBlocks,
@@ -53,6 +55,7 @@ export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }
   useEffect(() => {
     if (entry) {
       resetContent(entry.content);
+      setEntryTitle(entry.title || '');
       setIsEditing(false);
     }
   }, [entry, resetContent]);
@@ -63,7 +66,7 @@ export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }
 
     setIsSaving(true);
     try {
-      await updateEntry(entry.id, { content: getFilteredContent() });
+      await updateEntry(entry.id, { title: entryTitle.trim(), content: getFilteredContent() });
       setIsEditing(false);
       onUpdated();
     } catch (error) {
@@ -72,7 +75,7 @@ export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }
     } finally {
       setIsSaving(false);
     }
-  }, [entry, getFilteredContent, onUpdated]);
+  }, [entry, getFilteredContent, onUpdated, entryTitle]);
 
   // Delete entry
   const handleDelete = useCallback(() => {
@@ -158,6 +161,19 @@ export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {isEditing ? (
+              <TextInput
+                style={styles.titleInput}
+                placeholder="Title (optional)"
+                placeholderTextColor={colors.textTertiary}
+                value={entryTitle}
+                onChangeText={setEntryTitle}
+                returnKeyType="next"
+              />
+            ) : entryTitle ? (
+              <Text style={styles.titleText}>{entryTitle}</Text>
+            ) : null}
+
             {contentBlocks.map((block) => (
               <View key={block.id}>
                 <ContentBlockRenderer
@@ -234,5 +250,18 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.lg,
     paddingBottom: 20,
+  },
+  titleInput: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    padding: 0,
+  },
+  titleText: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
 });

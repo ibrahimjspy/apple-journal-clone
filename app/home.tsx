@@ -3,7 +3,7 @@
  * Features bottom sheet for creating entries and audio tiles with waveforms
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,12 +15,22 @@ import { getEntries, deleteEntry, formatDate } from '@/services/storage';
 import { JournalEntry } from '@/types/journal';
 import { confirmAction } from '@/utils/alert';
 
+type FilterType = 'all' | 'photos' | 'audio';
+
+const FILTER_LABELS: Record<FilterType, string> = {
+  all: 'All',
+  photos: 'With Photos',
+  audio: 'With Audio',
+};
+
 export default function HomeScreen() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Load entries on focus
   useFocusEffect(
@@ -29,21 +39,30 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const loadEntries = async () => {
+  const loadEntries = useCallback(async () => {
     const data = await getEntries();
     setEntries(data);
     setIsLoading(false);
-  };
+  }, []);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await loadEntries();
     setIsRefreshing(false);
-  };
+  }, [loadEntries]);
 
-  const handleEntrySaved = () => {
+  const handleEntrySaved = useCallback(() => {
     loadEntries();
-  };
+  }, [loadEntries]);
+
+  const filteredEntries = useMemo(() => 
+    entries.filter((entry) => {
+      if (activeFilter === 'photos') return (entry.previewImages?.length || 0) > 0;
+      if (activeFilter === 'audio') return entry.hasAudio;
+      return true;
+    }),
+    [entries, activeFilter]
+  );
 
   const hasEntries = entries.length > 0;
 
@@ -57,10 +76,37 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Journal</Text>
-          <Pressable style={styles.filterButton}>
-            <FilterIcon size={22} color={colors.textSecondary} />
+          <Pressable 
+            style={styles.filterButton}
+            onPress={() => setShowFilters(prev => !prev)}
+          >
+            <FilterIcon size={22} color={activeFilter !== 'all' ? colors.accent : colors.textSecondary} />
           </Pressable>
         </View>
+
+        {showFilters && (
+          <View style={styles.filterRow}>
+            {(Object.keys(FILTER_LABELS) as FilterType[]).map((key) => (
+              <Pressable
+                key={key}
+                style={[
+                  styles.filterPill,
+                  activeFilter === key && styles.filterPillActive,
+                ]}
+                onPress={() => setActiveFilter(key)}
+              >
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    activeFilter === key && styles.filterPillTextActive,
+                  ]}
+                >
+                  {FILTER_LABELS[key]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         {hasEntries ? (
           <ScrollView 
@@ -75,7 +121,7 @@ export default function HomeScreen() {
               />
             }
           >
-            {entries.map((entry) => (
+            {filteredEntries.map((entry) => (
               <JournalCard 
                 key={entry.id} 
                 entry={entry} 
@@ -207,12 +253,19 @@ function JournalCard({ entry, onPress, onDelete }: { entry: JournalEntry; onPres
         </View>
       )}
 
+      {/* Title */}
+      {entry.title ? (
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {entry.title}
+        </Text>
+      ) : null}
+
       {/* Content */}
-      {entry.previewText && (
-        <Text style={styles.cardContent} numberOfLines={4}>
+      {entry.previewText ? (
+        <Text style={styles.cardContent} numberOfLines={entry.title ? 2 : 4}>
           {entry.previewText}
         </Text>
-      )}
+      ) : null}
 
       {/* Audio Tile - Apple Style */}
       {audioBlock?.audioData && (
@@ -257,6 +310,29 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  filterPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surface,
+  },
+  filterPillActive: {
+    backgroundColor: colors.accent,
+  },
+  filterPillText: {
+    fontSize: typography.sizes.sm,
+    color: colors.textSecondary,
+    fontWeight: typography.weights.medium,
+  },
+  filterPillTextActive: {
+    color: colors.textPrimary,
   },
   scrollView: {
     flex: 1,
@@ -345,6 +421,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.semibold,
+  },
+  cardTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   cardContent: {
     fontSize: typography.sizes.md,

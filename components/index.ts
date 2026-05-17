@@ -1,4 +1,3 @@
-export * from './GoogleIcon';
 export * from './Icons';
 export * from './AudioRecorder';
 export * from './AudioPlayer';

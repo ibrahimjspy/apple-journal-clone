@@ -5,11 +5,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Audio } from 'expo-av';
+import { Audio, AVPlaybackStatus } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
 import { AudioEntry } from '@/types/journal';
+import { formatDurationMs } from '@/utils/time';
 
 interface AudioPlayerProps {
   audio: AudioEntry;
@@ -20,6 +21,7 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
 
   const loadSound = async () => {
     try {
+      setLoadError(false);
       const { sound } = await Audio.Sound.createAsync(
         { uri: audio.uri },
         { shouldPlay: false },
@@ -41,13 +44,15 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
       soundRef.current = sound;
     } catch (error) {
       console.error('Error loading sound:', error);
+      setLoadError(true);
     }
   };
 
-  const onPlaybackStatusUpdate = (status: any) => {
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
     if (status.isLoaded) {
-      const prog = status.positionMillis / status.durationMillis;
-      setProgress(prog);
+      const dur = status.durationMillis || 1;
+      const prog = status.positionMillis / dur;
+      setProgress(isFinite(prog) ? prog : 0);
       setCurrentTime(status.positionMillis);
 
       if (status.didJustFinish) {
@@ -71,13 +76,6 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
       await soundRef.current.playAsync();
       setIsPlaying(true);
     }
-  };
-
-  const formatTime = (ms: number): string => {
-    const totalSecs = Math.floor(ms / 1000);
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const waveformBars = audio.waveform || new Array(50).fill(0.3);
@@ -119,7 +117,7 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
             })}
           </View>
           <Text style={styles.compactTime}>
-            {formatTime(isPlaying ? currentTime : audio.duration)}
+            {formatDurationMs(isPlaying ? currentTime : audio.duration)}
           </Text>
         </LinearGradient>
       </Pressable>
@@ -150,7 +148,7 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
       </View>
 
       <View style={styles.controls}>
-        <Text style={styles.time}>{formatTime(currentTime)}</Text>
+        <Text style={styles.time}>{formatDurationMs(currentTime)}</Text>
         
         <Pressable 
           onPress={togglePlayback}
@@ -166,7 +164,7 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
           />
         </Pressable>
         
-        <Text style={styles.time}>{formatTime(audio.duration)}</Text>
+        <Text style={styles.time}>{formatDurationMs(audio.duration)}</Text>
       </View>
     </View>
   );

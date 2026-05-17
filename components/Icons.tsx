@@ -2,9 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet } from 'react-native';
 import { colors } from '@/constants/theme';
 
-// Re-export Ionicons for easy access
-export { Ionicons };
-
 // Icon sizes following Apple's sizing conventions
 export const IconSize = {
   xs: 16,
@@ -12,44 +9,6 @@ export const IconSize = {
   md: 24,
   lg: 28,
   xl: 32,
-} as const;
-
-// Common icon names used in the app (Ionicons)
-export const IconNames = {
-  // Navigation & Actions
-  add: 'add',
-  close: 'close',
-  back: 'chevron-back',
-  forward: 'chevron-forward',
-  more: 'ellipsis-horizontal',
-  options: 'options-outline',
-  
-  // Features
-  write: 'pencil',
-  mic: 'mic',
-  micOutline: 'mic-outline',
-  camera: 'camera',
-  cameraOutline: 'camera-outline',
-  image: 'image',
-  imageOutline: 'image-outline',
-  cloud: 'cloud-outline',
-  cloudDone: 'cloud-done-outline',
-  
-  // Journal specific
-  book: 'book',
-  bookOutline: 'book-outline',
-  calendar: 'calendar-outline',
-  time: 'time-outline',
-  
-  // Media controls
-  play: 'play',
-  pause: 'pause',
-  stop: 'stop',
-  
-  // Actions
-  trash: 'trash-outline',
-  share: 'share-outline',
-  download: 'download-outline',
 } as const;
 
 interface IconProps {

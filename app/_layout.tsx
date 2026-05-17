@@ -8,6 +8,7 @@ export default function RootLayout() {
     <SafeAreaProvider style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style="light" />
       <Stack
+        initialRouteName="home"
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: 'transparent' },

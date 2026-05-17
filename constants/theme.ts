@@ -146,14 +146,3 @@ export const cardLayout = {
   primaryImageRatio: 0.6, // 60% width for main image
 } as const;
 
-export const theme = {
-  colors,
-  spacing,
-  borderRadius,
-  typography,
-  shadows,
-  cardLayout,
-} as const;
-
-export type Theme = typeof theme;
-export type Colors = typeof colors;

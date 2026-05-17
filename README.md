@@ -1,105 +1,104 @@
 # Apple Journal Clone
 
-> An open-source Apple Journal clone for Android users who deserve a beautiful journaling experience without the $100/year price tag.
+> An open-source Apple Journal clone for Android users who deserve a beautiful journaling experience.
 
 ![Platform](https://img.shields.io/badge/platform-Android-green)
 ![Framework](https://img.shields.io/badge/framework-Expo%20React%20Native-blue)
 ![License](https://img.shields.io/badge/license-MIT-purple)
 
-<p align="center">
-  <img src="public/demo/demo1.png" alt="Apple Journal Clone Demo" width="300" />
-</p>
-
 ---
 
-## 🎯 Why This Exists
+## Why This Exists
 
-Apple's Journal app is genuinely beautiful—especially the audio journaling experience. But if you're on Android? Your options are:
+Apple's Journal app is genuinely beautiful — especially the audio journaling experience. But if you're on Android? Your options are:
 
 - **Paid apps** charging $100+/year for basic features
 - **Free apps** with cluttered UIs and aggressive ads
 - **"Premium" apps** that feel like they were designed in 2010
 
-This project aims to bring the elegant, focused journaling experience of Apple Journal to Android—**completely free and open source**.
+This project brings the elegant, focused journaling experience of Apple Journal to Android — **completely free and open source**.
 
 ---
 
-## 🏗️ Architecture Philosophy
+## Architecture
 
-### Zero Backend. Zero Servers. Your Data is Yours.
+### Local-First. Your Data is Yours.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Open Journal                        │
-├─────────────────────────────────────────────────────────┤
-│  Local Storage (Quick Access)  ←→  Google Drive (Sync)  │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│         Apple Journal Clone             │
+├─────────────────────────────────────────┤
+│  AsyncStorage (entries metadata)        │
+│  Device Storage (images & audio files)  │
+└─────────────────────────────────────────┘
 ```
 
 - **No backend API** — Everything runs on-device
 - **No database servers** — We don't store your journals
-- **Google Drive integration** — Your entries sync to YOUR Google Drive
-- **Local caching** — Fast access with in-app memory
-
-Your journal entries live in your Google Drive folder. Uninstall the app? Your data remains safe in your cloud.
+- **Local file storage** — Images and audio are saved to the app's persistent document directory
+- **AsyncStorage** — Entry metadata and content blocks
 
 ---
 
-## ✨ Core Features
+## Features
 
-### Main Screen
-- Beautiful journal entry cards in a scrollable feed
+### Journal Feed
+- Beautiful entry cards in a scrollable feed
 - Dark theme (Apple-inspired aesthetic)
-- Quick access to recent entries
+- Image grid previews on cards
+- Audio tiles with waveform visualization
+- Filter by: All, With Photos, With Audio
 
 ### Journal Entry Creation
 | Feature | Description |
 |---------|-------------|
-| **Title** | Simple, clean title input |
-| **Text** | Plain text content (no rich text complexity) |
-| **Images** | Inline images within text — place photos exactly where they make sense contextually |
-| **Audio** | 🎤 Apple-style audio recording with beautiful waveform visualization |
+| **Title** | Optional title for each entry |
+| **Text** | Plain text content blocks |
+| **Images** | Pick from gallery (multi-select) or take with camera — persisted to local storage |
+| **Audio** | Tap-to-record with live waveform, pause/resume, inline playback |
 
-### Audio Journaling (Priority Feature)
-The audio experience is what sets Apple Journal apart. We're replicating:
+### Audio Journaling
+The audio experience is what sets Apple Journal apart. We've replicated:
 - Tap-to-record simplicity
-- Visual waveform feedback
+- Pause and resume while recording
+- Visual waveform feedback (real-time metering)
+- Compact and full waveform playback
 - Inline audio players in entries
-- Seamless playback experience
+- Audio tiles on home cards with animated bars
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Expo React Native |
+| Framework | Expo SDK 52 + React Native 0.76 |
 | Language | TypeScript |
-| Storage | AsyncStorage + Google Drive API |
-| Auth | Google OAuth (for Drive access) |
+| Routing | expo-router (file-based) |
+| Storage | AsyncStorage (metadata) + expo-file-system (media) |
+| Audio | expo-av (record + playback) |
+| Images | expo-image-picker |
 | Theme | Dark mode only (for now) |
 
+---
 
-## 🚫 Intentionally Out of Scope
-
-To keep this focused and maintainable:
+## Intentionally Out of Scope (V1)
 
 | Feature | Why Not |
 |---------|---------|
+| Cloud sync / Google Drive | Keeping V1 simple and local-only |
 | Rich text editing | Adds complexity, journals should be simple |
-| Export functionality | Your data is already in Google Drive |
-| Backend/API | Privacy-first, no servers needed |
 | Social features | This is personal journaling |
 | Premium tier | Forever free, forever open |
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/open-journal.git
-cd open-journal
+git clone https://github.com/yourusername/apple-journal-clone.git
+cd apple-journal-clone
 
 # Install dependencies
 npm install
@@ -113,25 +112,25 @@ npx expo run:android
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Whether it's:
-- 🐛 Bug fixes
-- ✨ Feature implementations
-- 🎨 Design improvements
-- 📝 Documentation
+- Bug fixes
+- Feature implementations
+- Design improvements
+- Documentation
 
 Please read our contributing guidelines before submitting PRs.
 
 ---
 
-## 📄 License
+## License
 
 MIT License — Use it, fork it, make it yours.
 
 ---
 
-## 💭 Philosophy
+## Philosophy
 
 > "The best journal is the one you actually use."
 
@@ -140,6 +139,5 @@ We're not trying to build the most feature-rich journaling app. We're building o
 ---
 
 <p align="center">
-  <i>Built with ❤️ for Android users who just want to journal in peace.</i>
+  <i>Built for Android users who just want to journal in peace.</i>
 </p>
-

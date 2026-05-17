@@ -1,12 +1,17 @@
 /**
- * Reusable Content Editor Hook
- * Handles content blocks, media picking, and audio recording
+ * Content editor hook shared by CreateEntrySheet and ViewEntrySheet.
+ *
+ * Manages an ordered list of ContentBlocks (text/image/audio) and exposes
+ * actions to add, update, and remove blocks. Media picked via the image
+ * picker or audio recorder is automatically persisted to local storage
+ * before being added as a block (see services/media.ts).
  */
 
 import { useState, useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { ContentBlock, AudioEntry } from '@/types/journal';
-import { generateId } from '@/services/storage';
+import { generateId } from '@/utils/id';
+import { saveImageToLocal, saveAudioToLocal } from '@/services/media';
 import { showAlert } from '@/utils/alert';
 
 export function useContentEditor(initialContent: ContentBlock[] = []) {
@@ -48,19 +53,29 @@ export function useContentEditor(initialContent: ContentBlock[] = []) {
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      const newBlocks: ContentBlock[] = result.assets.map(asset => ({
-        id: generateId(),
-        type: 'image' as const,
-        content: asset.uri,
-        imageData: {
-          id: generateId(),
-          uri: asset.uri,
-          width: asset.width || 0,
-          height: asset.height || 0,
-        },
-      }));
+      try {
+        const newBlocks: ContentBlock[] = await Promise.all(
+          result.assets.map(async (asset) => {
+            const persistedUri = await saveImageToLocal(asset.uri);
+            return {
+              id: generateId(),
+              type: 'image' as const,
+              content: persistedUri,
+              imageData: {
+                id: generateId(),
+                uri: persistedUri,
+                width: asset.width || 0,
+                height: asset.height || 0,
+              },
+            };
+          })
+        );
 
-      setContentBlocks(prev => [...prev, ...newBlocks]);
+        setContentBlocks(prev => [...prev, ...newBlocks]);
+      } catch (error) {
+        console.error('Failed to save images:', error);
+        showAlert('Error', 'Failed to save images. Please try again.');
+      }
     }
   }, []);
 
@@ -75,33 +90,46 @@ export function useContentEditor(initialContent: ContentBlock[] = []) {
     const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
 
     if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0];
-      const newBlock: ContentBlock = {
-        id: generateId(),
-        type: 'image',
-        content: asset.uri,
-        imageData: {
+      try {
+        const asset = result.assets[0];
+        const persistedUri = await saveImageToLocal(asset.uri);
+        const newBlock: ContentBlock = {
           id: generateId(),
-          uri: asset.uri,
-          width: asset.width || 0,
-          height: asset.height || 0,
-        },
-      };
+          type: 'image',
+          content: persistedUri,
+          imageData: {
+            id: generateId(),
+            uri: persistedUri,
+            width: asset.width || 0,
+            height: asset.height || 0,
+          },
+        };
 
-      setContentBlocks(prev => [...prev, newBlock]);
+        setContentBlocks(prev => [...prev, newBlock]);
+      } catch (error) {
+        console.error('Failed to save photo:', error);
+        showAlert('Error', 'Failed to save photo. Please try again.');
+      }
     }
   }, []);
 
   // Handle audio recording complete
-  const handleAudioComplete = useCallback((audio: AudioEntry) => {
-    const newBlock: ContentBlock = {
-      id: generateId(),
-      type: 'audio',
-      content: audio.uri,
-      audioData: audio,
-    };
+  const handleAudioComplete = useCallback(async (audio: AudioEntry) => {
+    try {
+      const persistedUri = await saveAudioToLocal(audio.uri);
+      const persistedAudio: AudioEntry = { ...audio, uri: persistedUri };
+      const newBlock: ContentBlock = {
+        id: generateId(),
+        type: 'audio',
+        content: persistedUri,
+        audioData: persistedAudio,
+      };
 
-    setContentBlocks(prev => [...prev, newBlock]);
+      setContentBlocks(prev => [...prev, newBlock]);
+    } catch (error) {
+      console.error('Failed to save audio:', error);
+      showAlert('Error', 'Failed to save voice note. Please try again.');
+    }
     setShowAudioRecorder(false);
   }, []);
 

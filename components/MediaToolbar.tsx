@@ -16,10 +16,6 @@ interface MediaToolbarProps {
 export function MediaToolbar({ onPickImage, onTakePhoto, onRecordAudio }: MediaToolbarProps) {
   return (
     <View style={styles.toolbar}>
-      <Pressable style={styles.toolButton}>
-        <Icon name="sparkles" size={IconSize.md} color={colors.textSecondary} />
-      </Pressable>
-      
       <Pressable style={styles.toolButton} onPress={onPickImage}>
         <Icon name="images-outline" size={IconSize.md} color={colors.textSecondary} />
       </Pressable>
@@ -30,10 +26,6 @@ export function MediaToolbar({ onPickImage, onTakePhoto, onRecordAudio }: MediaT
       
       <Pressable style={styles.toolButton} onPress={onRecordAudio}>
         <Icon name="pulse" size={IconSize.md} color={colors.textSecondary} />
-      </Pressable>
-      
-      <Pressable style={styles.toolButton}>
-        <Icon name="location-outline" size={IconSize.md} color={colors.textSecondary} />
       </Pressable>
     </View>
   );

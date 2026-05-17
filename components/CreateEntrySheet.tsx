@@ -33,6 +33,7 @@ interface CreateEntrySheetProps {
 
 export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheetProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [title, setTitle] = useState('');
   const textInputRef = useRef<TextInput>(null);
   
   const {
@@ -52,7 +53,8 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
   // Focus text input when sheet opens
   useEffect(() => {
     if (visible) {
-      setTimeout(() => textInputRef.current?.focus(), 300);
+      const timer = setTimeout(() => textInputRef.current?.focus(), 300);
+      return () => clearTimeout(timer);
     }
   }, [visible]);
 
@@ -76,7 +78,7 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
     setIsSaving(true);
     try {
       const draft: JournalEntryDraft = {
-        title: '',
+        title: title.trim(),
         content: getFilteredContent(),
       };
 
@@ -89,18 +91,19 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
     } finally {
       setIsSaving(false);
     }
-  }, [hasContent, getFilteredContent, onSaved]);
+  }, [hasContent, getFilteredContent, onSaved, title, handleClose]);
 
   // Close and reset
   const handleClose = useCallback(() => {
     resetContent();
+    setTitle('');
     setShowAudioRecorder(false);
     onClose();
   }, [onClose, resetContent, setShowAudioRecorder]);
 
   // Cancel with confirmation if has content
   const handleCancel = useCallback(() => {
-    if (hasContent()) {
+    if (hasContent() || title.trim()) {
       confirmAction(
         {
           title: 'Discard Entry?',
@@ -151,6 +154,15 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            <TextInput
+              style={styles.titleInput}
+              placeholder="Title (optional)"
+              placeholderTextColor={colors.textTertiary}
+              value={title}
+              onChangeText={setTitle}
+              returnKeyType="next"
+            />
+
             {contentBlocks.map((block, index) => (
               <View key={block.id}>
                 <ContentBlockRenderer
@@ -221,5 +233,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.lg,
     paddingBottom: 20,
+  },
+  titleInput: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    padding: 0,
   },
 });
