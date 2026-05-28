@@ -30,9 +30,14 @@ interface AudioRecorderProps {
   onCancel: () => void;
 }
 
+const RECORDING_OPTIONS = {
+  ...RecordingPresets.HIGH_QUALITY,
+  isMeteringEnabled: true,
+};
+
 export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderProps) {
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recorderState = useAudioRecorderState(audioRecorder, 100);
+  const audioRecorder = useAudioRecorder(RECORDING_OPTIONS);
+  const recorderState = useAudioRecorderState(audioRecorder, 80);
 
   const [hasPermission, setHasPermission] = useState(false);
   const [duration, setDuration] = useState(0);

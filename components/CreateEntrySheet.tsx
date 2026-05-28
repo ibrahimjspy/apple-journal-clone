@@ -11,8 +11,6 @@ import {
   TextInput, 
   ScrollView, 
   Pressable,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { colors, spacing, typography } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
@@ -144,10 +142,7 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
         </View>
 
         {/* Content Area */}
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
+        <View style={styles.keyboardView}>
           <ScrollView 
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
@@ -182,7 +177,7 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
             onTakePhoto={takePhoto}
             onRecordAudio={() => setShowAudioRecorder(true)}
           />
-        </KeyboardAvoidingView>
+        </View>
       </BottomSheet>
 
       <AudioRecorderModal

@@ -11,8 +11,6 @@ import {
   StyleSheet, 
   ScrollView, 
   Pressable,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { colors, spacing, typography } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
@@ -151,10 +149,7 @@ export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }
         </View>
 
         {/* Content Area */}
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
+        <View style={styles.keyboardView}>
           <ScrollView 
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
@@ -193,7 +188,7 @@ export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }
               onRecordAudio={() => setShowAudioRecorder(true)}
             />
           )}
-        </KeyboardAvoidingView>
+        </View>
       </BottomSheet>
 
       <AudioRecorderModal

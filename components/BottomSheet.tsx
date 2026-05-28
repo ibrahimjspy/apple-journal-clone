@@ -3,7 +3,7 @@
  * Used by both CreateEntrySheet and ViewEntrySheet
  */
 
-import { useRef, useEffect, ReactNode } from 'react';
+import { useRef, useEffect, useState, ReactNode } from 'react';
 import { 
   View, 
   StyleSheet, 
@@ -11,6 +11,8 @@ import {
   Modal,
   Animated,
   Dimensions,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +30,7 @@ interface BottomSheetProps {
 export function BottomSheet({ visible, onClose, children, height = 0.85 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     if (visible) {
@@ -46,6 +49,30 @@ export function BottomSheet({ visible, onClose, children, height = 0.85 }: Botto
     }
   }, [visible, slideAnim]);
 
+  // Track keyboard so we can shrink the sheet's content area to keep the
+  // bottom toolbar visible above the keyboard on both iOS and Android.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // When keyboard is open, grow the sheet to full screen so the toolbar
+  // (which sits at sheet bottom) lifts above the keyboard via paddingBottom.
+  const baseHeight = SCREEN_HEIGHT * height;
+  const sheetHeight = keyboardHeight > 0 ? SCREEN_HEIGHT : baseHeight;
+  const bottomPadding = keyboardHeight > 0 ? keyboardHeight : insets.bottom;
+
   return (
     <Modal
       visible={visible}
@@ -63,9 +90,9 @@ export function BottomSheet({ visible, onClose, children, height = 0.85 }: Botto
         style={[
           styles.sheet,
           { 
-            height: SCREEN_HEIGHT * height,
+            height: sheetHeight,
             transform: [{ translateY: slideAnim }],
-            paddingBottom: insets.bottom,
+            paddingBottom: bottomPadding,
           }
         ]}
       >
