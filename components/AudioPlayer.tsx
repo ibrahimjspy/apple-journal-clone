@@ -18,7 +18,7 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
-  const player = useAudioPlayer({ uri: audio.uri }, 500);
+  const player = useAudioPlayer({ uri: audio.uri }, { updateInterval: 500 });
   const status = useAudioPlayerStatus(player);
 
   const isPlaying = status.playing;
