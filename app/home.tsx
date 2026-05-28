@@ -7,7 +7,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { colors, spacing, typography, borderRadius, shadows, fonts } from '@/constants/theme';
 import { Icon, JournalBrandIcon, FilterIcon, IconSize } from '@/components/Icons';
 import { AudioTile, CreateEntrySheet, ViewEntrySheet, CardImageGrid, ActionSheet, ActionSheetItem } from '@/components';
@@ -77,13 +77,27 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Journal</Text>
-          <Pressable 
-            testID="filter-button"
-            style={styles.filterButton}
-            onPress={() => setShowFilters(prev => !prev)}
-          >
-            <FilterIcon size={22} color={activeFilter !== 'all' ? colors.accent : colors.textSecondary} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              testID="filter-button"
+              style={styles.headerIconButton}
+              onPress={() => setShowFilters(prev => !prev)}
+              hitSlop={8}
+            >
+              <FilterIcon
+                size={22}
+                color={activeFilter !== 'all' ? colors.accent : colors.textSecondary}
+              />
+            </Pressable>
+            <Pressable
+              testID="settings-button"
+              style={styles.headerIconButton}
+              onPress={() => router.push('/settings')}
+              hitSlop={8}
+            >
+              <Icon name="settings-outline" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
         </View>
 
         {showFilters && (
@@ -335,7 +349,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     letterSpacing: -0.5,
   },
-  filterButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  headerIconButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
