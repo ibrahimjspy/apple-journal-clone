@@ -117,6 +117,31 @@ export async function toggleBookmark(id: string): Promise<boolean | null> {
   }
 }
 
+/**
+ * Merges a batch of entries into storage, skipping any whose IDs already exist.
+ * Used by the backup importer. Returns counts so the caller can report results.
+ */
+export async function mergeEntries(incoming: JournalEntry[]): Promise<{ added: number; skipped: number }> {
+  try {
+    const existing = await getEntries();
+    const existingIds = new Set(existing.map(e => e.id));
+    const toAdd = incoming.filter(e => !existingIds.has(e.id));
+
+    if (toAdd.length === 0) {
+      return { added: 0, skipped: incoming.length };
+    }
+
+    const merged = [...existing, ...toAdd].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(merged));
+    return { added: toAdd.length, skipped: incoming.length - toAdd.length };
+  } catch (error) {
+    console.error('Error merging entries:', error);
+    return { added: 0, skipped: incoming.length };
+  }
+}
+
 /** Deletes an entry and its associated media files from local storage. */
 export async function deleteEntry(id: string): Promise<boolean> {
   try {
