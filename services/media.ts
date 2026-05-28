@@ -4,7 +4,7 @@
  * document directory so they survive cache clears and app updates.
  */
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { generateId } from '@/utils/id';
 
 const MEDIA_DIR = `${FileSystem.documentDirectory}media/`;
