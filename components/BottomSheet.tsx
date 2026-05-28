@@ -49,8 +49,8 @@ export function BottomSheet({ visible, onClose, children, height = 0.85 }: Botto
     }
   }, [visible, slideAnim]);
 
-  // Track keyboard so we can shrink the sheet's content area to keep the
-  // bottom toolbar visible above the keyboard on both iOS and Android.
+  // Track keyboard so we can lift the sheet above it. We use will/did show
+  // appropriately per platform so animation feels native.
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -67,11 +67,14 @@ export function BottomSheet({ visible, onClose, children, height = 0.85 }: Botto
     };
   }, []);
 
-  // When keyboard is open, grow the sheet to full screen so the toolbar
-  // (which sits at sheet bottom) lifts above the keyboard via paddingBottom.
+  // Lift the sheet above the keyboard by shifting its bottom edge up.
+  // We also shrink the height by `keyboardHeight` so the top of the sheet
+  // never extends past the status bar (which would clip the handle/header).
   const baseHeight = SCREEN_HEIGHT * height;
-  const sheetHeight = keyboardHeight > 0 ? SCREEN_HEIGHT : baseHeight;
-  const bottomPadding = keyboardHeight > 0 ? keyboardHeight : insets.bottom;
+  const maxAvailableHeight = SCREEN_HEIGHT - insets.top - keyboardHeight - spacing.md;
+  const sheetHeight = keyboardHeight > 0 ? Math.min(baseHeight, maxAvailableHeight) : baseHeight;
+  const sheetBottom = keyboardHeight > 0 ? keyboardHeight : 0;
+  const bottomPadding = keyboardHeight > 0 ? 0 : insets.bottom;
 
   return (
     <Modal
@@ -91,6 +94,7 @@ export function BottomSheet({ visible, onClose, children, height = 0.85 }: Botto
           styles.sheet,
           { 
             height: sheetHeight,
+            bottom: sheetBottom,
             transform: [{ translateY: slideAnim }],
             paddingBottom: bottomPadding,
           }
