@@ -1,11 +1,12 @@
 /**
  * Audio Tile for Home Screen Cards
- * Shows waveform visualization with play button
+ * Compact waveform player shown on journal entry cards.
+ * Uses expo-audio for playback.
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { useCallback } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
@@ -17,134 +18,57 @@ interface AudioTileProps {
 }
 
 export function AudioTile({ audio }: AudioTileProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const soundRef = useRef<Audio.Sound | null>(null);
-  
-  // Animated values for waveform bars
-  const barAnimations = useRef<Animated.Value[]>(
-    (audio.waveform || []).slice(0, 30).map(() => new Animated.Value(1))
-  ).current;
+  const player = useAudioPlayer(audio.uri);
+  const status = useAudioPlayerStatus(player);
 
-  useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
+  const isPlaying = status.playing;
+  const durationMs = status.duration * 1000 || audio.duration || 1;
+  const currentMs = (status.currentTime ?? 0) * 1000;
+  const progress = durationMs > 0 ? currentMs / durationMs : 0;
 
-  // Animate playing bars
-  useEffect(() => {
+  const togglePlayback = useCallback(() => {
     if (isPlaying) {
-      const animations = barAnimations.map((anim, index) => {
-        return Animated.loop(
-          Animated.sequence([
-            Animated.timing(anim, {
-              toValue: 0.6 + Math.random() * 0.4,
-              duration: 150 + Math.random() * 100,
-              useNativeDriver: true,
-            }),
-            Animated.timing(anim, {
-              toValue: 1,
-              duration: 150 + Math.random() * 100,
-              useNativeDriver: true,
-            }),
-          ])
-        );
-      });
-
-      const composite = Animated.parallel(animations);
-      composite.start();
-
-      return () => {
-        composite.stop();
-      };
+      player.pause();
     } else {
-      barAnimations.forEach(anim => {
-        anim.stopAnimation();
-        anim.setValue(1);
-      });
-    }
-  }, [isPlaying, barAnimations]);
-
-  const loadAndPlay = async () => {
-    try {
-      if (soundRef.current) {
-        const status = await soundRef.current.getStatusAsync();
-        if (status.isLoaded) {
-          if (isPlaying) {
-            await soundRef.current.pauseAsync();
-            setIsPlaying(false);
-          } else {
-            await soundRef.current.playAsync();
-            setIsPlaying(true);
-          }
-          return;
-        }
+      if (progress >= 0.99) {
+        player.seekTo(0);
       }
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audio.uri },
-        { shouldPlay: true },
-        onPlaybackStatusUpdate
-      );
-      soundRef.current = sound;
-      setIsPlaying(true);
-    } catch (error) {
-      console.error('Error playing audio:', error);
+      player.play();
     }
-  };
-
-  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (status.isLoaded) {
-      const dur = status.durationMillis || 1;
-      const prog = status.positionMillis / dur;
-      setProgress(isFinite(prog) ? prog : 0);
-      
-      if (status.didJustFinish) {
-        setIsPlaying(false);
-        setProgress(0);
-      }
-    }
-  };
+  }, [isPlaying, player, progress]);
 
   const waveformBars = audio.waveform?.slice(0, 30) || new Array(30).fill(0.5);
 
   return (
-    <Pressable onPress={loadAndPlay} style={styles.container}>
+    <Pressable onPress={togglePlayback} style={styles.container}>
       <LinearGradient
         colors={[colors.accent, colors.accentSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        {/* Play/Pause Button */}
         <View style={styles.playButton}>
-          <Icon 
-            name={isPlaying ? 'pause' : 'play'} 
-            size={IconSize.md} 
-            color={colors.accent} 
+          <Icon
+            name={isPlaying ? 'pause' : 'play'}
+            size={IconSize.md}
+            color={colors.accent}
           />
         </View>
 
-        {/* Waveform */}
         <View style={styles.waveformContainer}>
           {waveformBars.map((level, index) => {
             const barProgress = index / waveformBars.length;
             const isPlayed = barProgress <= progress;
-            
             return (
-              <Animated.View
+              <View
                 key={index}
                 style={[
                   styles.bar,
                   {
                     height: `${Math.max(20, level * 100)}%`,
-                    backgroundColor: isPlayed 
-                      ? 'rgba(255, 255, 255, 1)' 
+                    backgroundColor: isPlayed
+                      ? 'rgba(255, 255, 255, 1)'
                       : 'rgba(255, 255, 255, 0.5)',
-                    transform: [{ scaleY: barAnimations[index] || 1 }],
                   },
                 ]}
               />
@@ -152,7 +76,6 @@ export function AudioTile({ audio }: AudioTileProps) {
           })}
         </View>
 
-        {/* Duration */}
         <Text style={styles.duration}>{formatDurationMs(audio.duration)}</Text>
       </LinearGradient>
     </Pressable>
@@ -199,4 +122,3 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
 });
-

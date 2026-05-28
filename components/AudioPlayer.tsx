@@ -1,11 +1,11 @@
 /**
  * Apple-style Audio Player with Waveform Display
- * Shows stored waveform and playback progress
+ * Uses expo-audio for playback (replaces deprecated expo-av).
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
@@ -18,69 +18,27 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [loadError, setLoadError] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const player = useAudioPlayer(audio.uri);
+  const status = useAudioPlayerStatus(player);
 
-  useEffect(() => {
-    loadSound();
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, [audio.uri]);
+  const isPlaying = status.playing;
+  const durationMs = status.duration * 1000 || audio.duration || 1;
+  const currentMs = (status.currentTime ?? 0) * 1000;
+  const progress = durationMs > 0 ? currentMs / durationMs : 0;
 
-  const loadSound = async () => {
-    try {
-      setLoadError(false);
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audio.uri },
-        { shouldPlay: false },
-        onPlaybackStatusUpdate
-      );
-      soundRef.current = sound;
-    } catch (error) {
-      console.error('Error loading sound:', error);
-      setLoadError(true);
-    }
-  };
-
-  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (status.isLoaded) {
-      const dur = status.durationMillis || 1;
-      const prog = status.positionMillis / dur;
-      setProgress(isFinite(prog) ? prog : 0);
-      setCurrentTime(status.positionMillis);
-
-      if (status.didJustFinish) {
-        setIsPlaying(false);
-        setProgress(0);
-        setCurrentTime(0);
-      }
-    }
-  };
-
-  const togglePlayback = async () => {
-    if (!soundRef.current) return;
-
+  const togglePlayback = useCallback(() => {
     if (isPlaying) {
-      await soundRef.current.pauseAsync();
-      setIsPlaying(false);
+      player.pause();
     } else {
       if (progress >= 0.99) {
-        await soundRef.current.setPositionAsync(0);
+        player.seekTo(0);
       }
-      await soundRef.current.playAsync();
-      setIsPlaying(true);
+      player.play();
     }
-  };
+  }, [isPlaying, player, progress]);
 
   const waveformBars = audio.waveform || new Array(50).fill(0.3);
 
-  // Compact mode for create entry sheet
   if (compact) {
     return (
       <Pressable onPress={togglePlayback} style={styles.compactContainer}>
@@ -91,10 +49,10 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
           style={styles.compactGradient}
         >
           <View style={styles.compactPlayButton}>
-            <Icon 
-              name={isPlaying ? 'pause' : 'play'} 
-              size={IconSize.sm} 
-              color={colors.accent} 
+            <Icon
+              name={isPlaying ? 'pause' : 'play'}
+              size={IconSize.sm}
+              color={colors.accent}
             />
           </View>
           <View style={styles.compactWaveform}>
@@ -107,8 +65,8 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
                     styles.compactBar,
                     {
                       height: `${Math.max(20, level * 100)}%`,
-                      backgroundColor: isPlayed 
-                        ? 'rgba(255, 255, 255, 1)' 
+                      backgroundColor: isPlayed
+                        ? 'rgba(255, 255, 255, 1)'
                         : 'rgba(255, 255, 255, 0.5)',
                     },
                   ]}
@@ -117,21 +75,19 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
             })}
           </View>
           <Text style={styles.compactTime}>
-            {formatDurationMs(isPlaying ? currentTime : audio.duration)}
+            {formatDurationMs(isPlaying ? currentMs : audio.duration)}
           </Text>
         </LinearGradient>
       </Pressable>
     );
   }
 
-  // Full mode
   return (
     <View style={styles.container}>
       <View style={styles.waveformContainer}>
         {waveformBars.map((level, index) => {
           const barProgress = index / waveformBars.length;
           const isPlayed = barProgress <= progress;
-          
           return (
             <View
               key={index}
@@ -148,22 +104,20 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
       </View>
 
       <View style={styles.controls}>
-        <Text style={styles.time}>{formatDurationMs(currentTime)}</Text>
-        
-        <Pressable 
+        <Text style={styles.time}>{formatDurationMs(currentMs)}</Text>
+        <Pressable
           onPress={togglePlayback}
           style={({ pressed }) => [
             styles.playButton,
-            pressed && styles.playButtonPressed
+            pressed && styles.playButtonPressed,
           ]}
         >
-          <Icon 
-            name={isPlaying ? 'pause' : 'play'} 
-            size={IconSize.lg} 
-            color={colors.textPrimary} 
+          <Icon
+            name={isPlaying ? 'pause' : 'play'}
+            size={IconSize.lg}
+            color={colors.textPrimary}
           />
         </Pressable>
-        
         <Text style={styles.time}>{formatDurationMs(audio.duration)}</Text>
       </View>
     </View>
@@ -212,7 +166,6 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
     opacity: 0.9,
   },
-  // Compact styles
   compactContainer: {
     flex: 1,
     borderRadius: borderRadius.lg,
