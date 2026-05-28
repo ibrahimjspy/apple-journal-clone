@@ -83,30 +83,38 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
     }
   }, [isRecording, isPaused, pulseAnim, ringOpacity]);
 
-  // Simulate waveform from metering
+  // Drive waveform from real metering data
+  const lastMetering = useRef<number>(-160);
   useEffect(() => {
-    if (isRecording && !isPaused && recorderState.metering != null) {
-      const metering = recorderState.metering;
-      const minDb = -50;
-      const maxDb = -5;
-      const normalized = Math.max(0.08, Math.min(1, (metering - minDb) / (maxDb - minDb)));
-      const variation = (Math.random() - 0.5) * 0.12;
-      const level = Math.max(0.08, Math.min(1, normalized + variation));
+    if (!isRecording || isPaused) return;
+    const metering = recorderState.metering ?? -160;
+    if (metering === lastMetering.current) return;
+    lastMetering.current = metering;
 
-      waveformSamples.current.push(level);
+    // Android metering typically ranges -60 (silence) to 0 (max)
+    // iOS is similar but can go to -160 for silence
+    const minDb = -60;
+    const maxDb = 0;
+    const clamped = Math.max(minDb, Math.min(maxDb, metering));
+    const normalized = (clamped - minDb) / (maxDb - minDb); // 0..1
+    // Apply curve to make louder sounds more dramatic
+    const curved = Math.pow(normalized, 0.6);
+    const variation = (Math.random() - 0.5) * 0.08;
+    const level = Math.max(0.05, Math.min(1, curved + variation));
 
-      setWaveformLevels(prev => {
-        const next = [...prev.slice(1), level];
-        next.forEach((val, i) => {
-          Animated.timing(barAnims[i], {
-            toValue: val,
-            duration: 80,
-            useNativeDriver: false,
-          }).start();
-        });
-        return next;
+    waveformSamples.current.push(level);
+
+    setWaveformLevels(prev => {
+      const next = [...prev.slice(1), level];
+      next.forEach((val, i) => {
+        Animated.timing(barAnims[i], {
+          toValue: val,
+          duration: 60,
+          useNativeDriver: false,
+        }).start();
       });
-    }
+      return next;
+    });
   }, [isRecording, isPaused, recorderState.metering, barAnims]);
 
   const startDurationTimer = useCallback(() => {
@@ -210,8 +218,8 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
                   styles.waveBar,
                   {
                     height: anim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [4, 64],
+                      inputRange: [0, 0.3, 0.6, 1],
+                      outputRange: [4, 20, 50, 100],
                     }),
                     backgroundColor: isPaused ? colors.textTertiary : colors.accent,
                   },
@@ -277,7 +285,7 @@ const styles = StyleSheet.create({
   doneText: { color: colors.accent, fontSize: typography.sizes.lg, fontFamily: fonts.semibold, width: 50, textAlign: 'right' },
 
   waveformArea: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  waveform: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 80, width: '100%', gap: 3 },
+  waveform: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 120, width: '100%', gap: 3 },
   waveBar: { width: 3, borderRadius: 1.5, minHeight: 3 },
 
   timer: {

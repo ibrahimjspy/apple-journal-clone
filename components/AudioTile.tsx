@@ -60,20 +60,24 @@ export function AudioTile({ audio }: AudioTileProps) {
 
         {/* Waveform bars */}
         <View style={styles.waveform}>
-          {waveformBars.map((level, i) => (
-            <View
-              key={i}
-              style={[
-                styles.bar,
-                {
-                  height: Math.max(4, level * 28),
-                  backgroundColor: i / waveformBars.length <= progress
-                    ? 'rgba(255,255,255,1)'
-                    : 'rgba(255,255,255,0.35)',
-                },
-              ]}
-            />
-          ))}
+          {waveformBars.map((level, i) => {
+            const barPos = i / waveformBars.length;
+            const isPlayed = barPos <= progress;
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.bar,
+                  {
+                    height: Math.max(4, level * 28),
+                    backgroundColor: isPlayed
+                      ? 'rgba(255,255,255,1)'
+                      : 'rgba(255,255,255,0.3)',
+                  },
+                ]}
+              />
+            );
+          })}
         </View>
 
         {/* Duration */}

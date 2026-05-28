@@ -81,20 +81,24 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
     <View style={styles.container}>
       {/* Waveform */}
       <View style={styles.waveformRow}>
-        {waveformBars.map((level, i) => (
-          <View
-            key={i}
-            style={[
-              styles.bar,
-              {
-                height: Math.max(3, level * 48),
-                backgroundColor: i / waveformBars.length <= progress
-                  ? colors.accent
-                  : colors.surfaceTertiary,
-              },
-            ]}
-          />
-        ))}
+        {waveformBars.map((level, i) => {
+          const barPos = i / waveformBars.length;
+          const isPlayed = barPos <= progress;
+          const isCurrent = Math.abs(barPos - progress) < 1 / waveformBars.length;
+          return (
+            <View
+              key={i}
+              style={[
+                styles.bar,
+                {
+                  height: Math.max(3, level * 48),
+                  backgroundColor: isPlayed ? colors.accent : colors.surfaceTertiary,
+                  opacity: isCurrent && isPlaying ? 1 : isPlayed ? 0.9 : 0.5,
+                },
+              ]}
+            />
+          );
+        })}
       </View>
 
       {/* Controls */}
