@@ -1,14 +1,15 @@
 /**
  * Audio Tile for Home Screen Cards
- * Compact waveform player shown on journal entry cards.
- * Uses expo-audio (SDK 54 API) for playback.
+ *
+ * Apple Journal-style gradient pill with waveform bars,
+ * play/pause button, and duration label.
  */
 
 import { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, borderRadius, typography } from '@/constants/theme';
+import { colors, spacing, borderRadius, typography, fonts } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
 import { AudioEntry } from '@/types/journal';
 import { formatDurationMs } from '@/utils/time';
@@ -35,64 +36,93 @@ export function AudioTile({ audio }: AudioTileProps) {
     }
   }, [isPlaying, player, progress]);
 
-  const waveformBars = audio.waveform?.slice(0, 30) || new Array(30).fill(0.5);
+  const waveformBars = audio.waveform?.slice(0, 35) || new Array(35).fill(0.5);
 
   return (
-    <Pressable onPress={togglePlayback} style={styles.container}>
+    <Pressable
+      onPress={togglePlayback}
+      style={({ pressed }) => [styles.container, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+    >
       <LinearGradient
         colors={[colors.accent, colors.accentSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        <View style={styles.playButton}>
-          <Icon name={isPlaying ? 'pause' : 'play'} size={IconSize.md} color={colors.accent} />
+        {/* Play button */}
+        <View style={styles.playBtn}>
+          <Icon
+            name={isPlaying ? 'pause' : 'play'}
+            size={IconSize.sm}
+            color={colors.accent}
+          />
         </View>
-        <View style={styles.waveformContainer}>
-          {waveformBars.map((level, index) => (
+
+        {/* Waveform bars */}
+        <View style={styles.waveform}>
+          {waveformBars.map((level, i) => (
             <View
-              key={index}
+              key={i}
               style={[
                 styles.bar,
                 {
-                  height: `${Math.max(20, level * 100)}%`,
-                  backgroundColor: index / waveformBars.length <= progress
+                  height: Math.max(4, level * 28),
+                  backgroundColor: i / waveformBars.length <= progress
                     ? 'rgba(255,255,255,1)'
-                    : 'rgba(255,255,255,0.4)',
+                    : 'rgba(255,255,255,0.35)',
                 },
               ]}
             />
           ))}
         </View>
-        <Text style={styles.duration}>{formatDurationMs(audio.duration)}</Text>
+
+        {/* Duration */}
+        <Text style={styles.duration}>
+          {formatDurationMs(isPlaying ? currentMs : audio.duration)}
+        </Text>
       </LinearGradient>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { borderRadius: borderRadius.lg, overflow: 'hidden', marginVertical: spacing.sm },
+  container: {
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    marginVertical: spacing.sm,
+  },
   gradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
-  playButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.textPrimary,
+  playBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  waveformContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', height: 32, gap: 2 },
-  bar: { flex: 1, borderRadius: 1, minHeight: 4 },
+  waveform: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 28,
+    gap: 1.5,
+  },
+  bar: {
+    flex: 1,
+    borderRadius: 1,
+    minHeight: 4,
+  },
   duration: {
     fontSize: typography.sizes.sm,
-    color: colors.textPrimary,
-    fontWeight: typography.weights.medium,
+    fontFamily: fonts.medium,
+    color: 'rgba(255,255,255,0.9)',
     fontVariant: ['tabular-nums'],
-    marginLeft: spacing.sm,
+    marginLeft: spacing.xs,
   },
 });

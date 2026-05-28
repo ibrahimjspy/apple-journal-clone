@@ -1,13 +1,16 @@
 /**
- * Apple-style Audio Player with Waveform Display
- * Uses expo-audio (SDK 54 API) for playback.
+ * Apple Journal-style Audio Player
+ *
+ * Two modes:
+ * - Full: dark card with waveform, play button, and time labels
+ * - Compact: gradient pill with small waveform (used in compose sheets)
  */
 
 import { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, borderRadius, typography } from '@/constants/theme';
+import { colors, spacing, borderRadius, typography, fonts } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
 import { AudioEntry } from '@/types/journal';
 import { formatDurationMs } from '@/utils/time';
@@ -30,9 +33,7 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
     if (isPlaying) {
       player.pause();
     } else {
-      if (progress >= 0.99) {
-        player.seekTo(0);
-      }
+      if (progress >= 0.99) player.seekTo(0);
       player.play();
     }
   }, [isPlaying, player, progress]);
@@ -40,6 +41,7 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
   const waveformBars = audio.waveform || new Array(50).fill(0.3);
 
   if (compact) {
+    const compactBars = waveformBars.slice(0, 30);
     return (
       <Pressable onPress={togglePlayback} style={styles.compactContainer}>
         <LinearGradient
@@ -48,20 +50,20 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
           end={{ x: 1, y: 1 }}
           style={styles.compactGradient}
         >
-          <View style={styles.compactPlayButton}>
-            <Icon name={isPlaying ? 'pause' : 'play'} size={IconSize.sm} color={colors.accent} />
+          <View style={styles.compactPlayBtn}>
+            <Icon name={isPlaying ? 'pause' : 'play'} size={14} color={colors.accent} />
           </View>
           <View style={styles.compactWaveform}>
-            {waveformBars.slice(0, 25).map((level, index) => (
+            {compactBars.map((level, i) => (
               <View
-                key={index}
+                key={i}
                 style={[
                   styles.compactBar,
                   {
-                    height: `${Math.max(20, level * 100)}%`,
-                    backgroundColor: index / 25 <= progress
+                    height: Math.max(3, level * 22),
+                    backgroundColor: i / compactBars.length <= progress
                       ? 'rgba(255,255,255,1)'
-                      : 'rgba(255,255,255,0.4)',
+                      : 'rgba(255,255,255,0.35)',
                   },
                 ]}
               />
@@ -77,15 +79,16 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.waveformContainer}>
-        {waveformBars.map((level, index) => (
+      {/* Waveform */}
+      <View style={styles.waveformRow}>
+        {waveformBars.map((level, i) => (
           <View
-            key={index}
+            key={i}
             style={[
               styles.bar,
               {
-                height: `${Math.max(15, level * 100)}%`,
-                backgroundColor: index / waveformBars.length <= progress
+                height: Math.max(3, level * 48),
+                backgroundColor: i / waveformBars.length <= progress
                   ? colors.accent
                   : colors.surfaceTertiary,
               },
@@ -93,15 +96,17 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
           />
         ))}
       </View>
+
+      {/* Controls */}
       <View style={styles.controls}>
         <Text style={styles.time}>{formatDurationMs(currentMs)}</Text>
         <Pressable
           onPress={togglePlayback}
-          style={({ pressed }) => [styles.playButton, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.playBtn, pressed && { transform: [{ scale: 0.93 }] }]}
         >
-          <Icon name={isPlaying ? 'pause' : 'play'} size={IconSize.lg} color={colors.textPrimary} />
+          <Icon name={isPlaying ? 'pause' : 'play'} size={IconSize.md} color={colors.textPrimary} />
         </Pressable>
-        <Text style={styles.time}>{formatDurationMs(audio.duration)}</Text>
+        <Text style={[styles.time, { textAlign: 'right' }]}>{formatDurationMs(audio.duration)}</Text>
       </View>
     </View>
   );
@@ -110,60 +115,81 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
+    paddingVertical: spacing.lg,
   },
-  waveformContainer: {
+  waveformRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 60,
+    height: 48,
     gap: 2,
     marginBottom: spacing.md,
   },
-  bar: { width: 3, borderRadius: 1.5, minHeight: 4 },
+  bar: {
+    width: 2.5,
+    borderRadius: 1.25,
+    minHeight: 3,
+  },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   time: {
-    fontSize: typography.sizes.sm,
-    color: colors.textSecondary,
+    fontSize: typography.sizes.xs,
+    fontFamily: fonts.medium,
+    color: colors.textTertiary,
     fontVariant: ['tabular-nums'],
-    width: 40,
+    width: 36,
   },
-  playButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  playBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pressed: { transform: [{ scale: 0.95 }], opacity: 0.9 },
-  compactContainer: { flex: 1, borderRadius: borderRadius.lg, overflow: 'hidden' },
+
+  // Compact (compose sheet)
+  compactContainer: {
+    flex: 1,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+  },
   compactGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.sm,
+    paddingVertical: 10,
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
-  compactPlayButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.textPrimary,
+  compactPlayBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  compactWaveform: { flex: 1, flexDirection: 'row', alignItems: 'center', height: 24, gap: 2 },
-  compactBar: { flex: 1, borderRadius: 1, minHeight: 4 },
+  compactWaveform: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 22,
+    gap: 1.5,
+  },
+  compactBar: {
+    flex: 1,
+    borderRadius: 1,
+    minHeight: 3,
+  },
   compactTime: {
     fontSize: typography.sizes.xs,
-    color: colors.textPrimary,
+    fontFamily: fonts.medium,
+    color: 'rgba(255,255,255,0.9)',
     fontVariant: ['tabular-nums'],
-    fontWeight: typography.weights.medium,
   },
 });
