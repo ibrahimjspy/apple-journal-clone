@@ -4,24 +4,25 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { colors, spacing, typography, borderRadius, shadows, fonts } from '@/constants/theme';
 import { Icon, JournalBrandIcon, FilterIcon, IconSize } from '@/components/Icons';
-import { AudioTile, CreateEntrySheet, ViewEntrySheet } from '@/components';
+import { AudioTile, CreateEntrySheet, ViewEntrySheet, CardImageGrid } from '@/components';
 import { getEntries, deleteEntry, formatDate } from '@/services/storage';
 import { JournalEntry } from '@/types/journal';
 import { confirmAction } from '@/utils/alert';
 
 type FilterType = 'all' | 'photos' | 'audio';
 
-const FILTER_LABELS: Record<FilterType, string> = {
-  all: 'All',
-  photos: 'With Photos',
-  audio: 'With Audio',
-};
+/** Filter definitions in display order with their icons. */
+const FILTERS: Array<{ id: FilterType; label: string; icon: 'apps-outline' | 'images-outline' | 'mic-outline' }> = [
+  { id: 'all', label: 'All', icon: 'apps-outline' },
+  { id: 'photos', label: 'Photos', icon: 'images-outline' },
+  { id: 'audio', label: 'Audio', icon: 'mic-outline' },
+];
 
 export default function HomeScreen() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -86,27 +87,36 @@ export default function HomeScreen() {
         </View>
 
         {showFilters && (
-          <View style={styles.filterRow}>
-            {(Object.keys(FILTER_LABELS) as FilterType[]).map((key) => (
-              <Pressable
-                key={key}
-                style={[
-                  styles.filterPill,
-                  activeFilter === key && styles.filterPillActive,
-                ]}
-                onPress={() => setActiveFilter(key)}
-              >
-                <Text
-                  style={[
-                    styles.filterPillText,
-                    activeFilter === key && styles.filterPillTextActive,
-                  ]}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            {FILTERS.map(({ id, label, icon }) => {
+              const isActive = activeFilter === id;
+              return (
+                <Pressable
+                  key={id}
+                  style={[styles.filterPill, isActive && styles.filterPillActive]}
+                  onPress={() => setActiveFilter(id)}
                 >
-                  {FILTER_LABELS[key]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                  <Icon
+                    name={icon}
+                    size={14}
+                    color={isActive ? colors.textPrimary : colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      isActive && styles.filterPillTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         )}
 
         {hasEntries ? (
@@ -190,11 +200,7 @@ function EmptyState() {
 }
 
 function JournalCard({ entry, onPress, onDelete }: { entry: JournalEntry; onPress: () => void; onDelete: () => void }) {
-  const imageCount = entry.previewImages?.length || 0;
-  const showBadge = imageCount > 5;
-  const displayImages = entry.previewImages?.slice(0, 5) || [];
-  
-  // Find first audio block for display
+  const images = entry.previewImages || [];
   const audioBlock = entry.content.find(block => block.type === 'audio' && block.audioData);
 
   const handleMorePress = () => {
@@ -220,38 +226,10 @@ function JournalCard({ entry, onPress, onDelete }: { entry: JournalEntry; onPres
       ]}
       onPress={onPress}
     >
-      {/* Image Grid */}
-      {imageCount > 0 && (
-        <View style={styles.imageGrid}>
-          <View style={styles.imageGridLeft}>
-            <Image 
-              source={{ uri: displayImages[0] }} 
-              style={styles.imagePrimary}
-              resizeMode="cover"
-            />
-          </View>
-          {imageCount > 1 && (
-            <View style={styles.imageGridRight}>
-              {[1, 2, 3, 4].map((index) => (
-                <View key={index} style={styles.smallImageContainer}>
-                  {displayImages[index] ? (
-                    <Image 
-                      source={{ uri: displayImages[index] }} 
-                      style={styles.smallImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.smallImagePlaceholder} />
-                  )}
-                  {index === 4 && showBadge && (
-                    <View style={styles.imageBadge}>
-                      <Text style={styles.imageBadgeText}>+{imageCount - 5}</Text>
-                    </View>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
+      {/* Adaptive image grid (returns null when no images) */}
+      {images.length > 0 && (
+        <View style={styles.imageGridWrapper}>
+          <CardImageGrid images={images} />
         </View>
       )}
 
@@ -314,24 +292,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterRow: {
-    flexDirection: 'row',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
     gap: spacing.sm,
+    flexDirection: 'row',
   },
   filterPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: borderRadius.full,
     backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   filterPillActive: {
     backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   filterPillText: {
     fontSize: typography.sizes.sm,
+    fontFamily: fonts.medium,
     color: colors.textSecondary,
-    fontWeight: typography.weights.medium,
   },
   filterPillTextActive: {
     color: colors.textPrimary,
@@ -376,54 +360,8 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  imageGrid: {
-    flexDirection: 'row',
-    height: 140,
+  imageGridWrapper: {
     marginBottom: spacing.sm,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    gap: 2,
-  },
-  imageGridLeft: {
-    flex: 0.6,
-  },
-  imageGridRight: {
-    flex: 0.4,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 2,
-  },
-  imagePrimary: {
-    flex: 1,
-    borderRadius: borderRadius.sm,
-  },
-  smallImageContainer: {
-    width: '48%',
-    height: '48%',
-    position: 'relative',
-  },
-  smallImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: borderRadius.sm,
-  },
-  smallImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.surfaceTertiary,
-    borderRadius: borderRadius.sm,
-  },
-  imageBadge: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.badge,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: borderRadius.sm,
-  },
-  imageBadgeText: {
-    color: colors.textPrimary,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.semibold,
   },
   cardTitle: {
     fontSize: typography.sizes.lg,
