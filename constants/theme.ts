@@ -81,8 +81,14 @@ export const borderRadius = {
   full: 9999,
 } as const;
 
+export const fonts = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+} as const;
+
 export const typography = {
-  // Font sizes
   sizes: {
     xs: 11,
     sm: 13,
@@ -93,14 +99,12 @@ export const typography = {
     xxxl: 34,
     display: 40,
   },
-  // Font weights
   weights: {
     regular: '400' as const,
     medium: '500' as const,
     semibold: '600' as const,
     bold: '700' as const,
   },
-  // Line heights
   lineHeights: {
     tight: 1.2,
     normal: 1.4,

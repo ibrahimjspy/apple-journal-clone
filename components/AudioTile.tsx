@@ -1,7 +1,7 @@
 /**
  * Audio Tile for Home Screen Cards
  * Compact waveform player shown on journal entry cards.
- * Uses expo-audio for playback.
+ * Uses expo-audio (SDK 54 API) for playback.
  */
 
 import { useCallback } from 'react';
@@ -18,21 +18,19 @@ interface AudioTileProps {
 }
 
 export function AudioTile({ audio }: AudioTileProps) {
-  const player = useAudioPlayer(audio.uri);
+  const player = useAudioPlayer({ uri: audio.uri }, 500);
   const status = useAudioPlayerStatus(player);
 
   const isPlaying = status.playing;
-  const durationMs = status.duration * 1000 || audio.duration || 1;
+  const durationMs = (status.duration ?? 0) * 1000 || audio.duration || 1;
   const currentMs = (status.currentTime ?? 0) * 1000;
-  const progress = durationMs > 0 ? currentMs / durationMs : 0;
+  const progress = durationMs > 0 ? Math.min(currentMs / durationMs, 1) : 0;
 
   const togglePlayback = useCallback(() => {
     if (isPlaying) {
       player.pause();
     } else {
-      if (progress >= 0.99) {
-        player.seekTo(0);
-      }
+      if (progress >= 0.99) player.seekTo(0);
       player.play();
     }
   }, [isPlaying, player, progress]);
@@ -48,34 +46,24 @@ export function AudioTile({ audio }: AudioTileProps) {
         style={styles.gradient}
       >
         <View style={styles.playButton}>
-          <Icon
-            name={isPlaying ? 'pause' : 'play'}
-            size={IconSize.md}
-            color={colors.accent}
-          />
+          <Icon name={isPlaying ? 'pause' : 'play'} size={IconSize.md} color={colors.accent} />
         </View>
-
         <View style={styles.waveformContainer}>
-          {waveformBars.map((level, index) => {
-            const barProgress = index / waveformBars.length;
-            const isPlayed = barProgress <= progress;
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.bar,
-                  {
-                    height: `${Math.max(20, level * 100)}%`,
-                    backgroundColor: isPlayed
-                      ? 'rgba(255, 255, 255, 1)'
-                      : 'rgba(255, 255, 255, 0.5)',
-                  },
-                ]}
-              />
-            );
-          })}
+          {waveformBars.map((level, index) => (
+            <View
+              key={index}
+              style={[
+                styles.bar,
+                {
+                  height: `${Math.max(20, level * 100)}%`,
+                  backgroundColor: index / waveformBars.length <= progress
+                    ? 'rgba(255,255,255,1)'
+                    : 'rgba(255,255,255,0.4)',
+                },
+              ]}
+            />
+          ))}
         </View>
-
         <Text style={styles.duration}>{formatDurationMs(audio.duration)}</Text>
       </LinearGradient>
     </Pressable>
@@ -83,11 +71,7 @@ export function AudioTile({ audio }: AudioTileProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    marginVertical: spacing.sm,
-  },
+  container: { borderRadius: borderRadius.lg, overflow: 'hidden', marginVertical: spacing.sm },
   gradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -102,18 +86,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  waveformContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 32,
-    gap: 2,
-  },
-  bar: {
-    flex: 1,
-    borderRadius: 1,
-    minHeight: 4,
-  },
+  waveformContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', height: 32, gap: 2 },
+  bar: { flex: 1, borderRadius: 1, minHeight: 4 },
   duration: {
     fontSize: typography.sizes.sm,
     color: colors.textPrimary,

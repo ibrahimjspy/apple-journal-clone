@@ -8,7 +8,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Image, RefreshControl } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import { colors, spacing, typography, borderRadius, shadows } from '@/constants/theme';
+import { colors, spacing, typography, borderRadius, shadows, fonts } from '@/constants/theme';
 import { Icon, JournalBrandIcon, FilterIcon, IconSize } from '@/components/Icons';
 import { AudioTile, CreateEntrySheet, ViewEntrySheet } from '@/components';
 import { getEntries, deleteEntry, formatDate } from '@/services/storage';
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.sizes.xxxl,
-    fontWeight: typography.weights.bold,
+    fontFamily: fonts.bold,
     color: colors.textPrimary,
     letterSpacing: -0.5,
   },
@@ -352,13 +352,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.semibold,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
   emptySubtitle: {
     fontSize: typography.sizes.md,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
@@ -426,12 +427,13 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.semibold,
+    fontFamily: fonts.semibold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
   cardContent: {
     fontSize: typography.sizes.md,
+    fontFamily: fonts.regular,
     color: colors.textSecondary,
     lineHeight: 20,
     marginBottom: spacing.sm,
@@ -444,6 +446,7 @@ const styles = StyleSheet.create({
   },
   cardDate: {
     fontSize: typography.sizes.sm,
+    fontFamily: fonts.regular,
     color: colors.textTertiary,
   },
   moreButton: {

@@ -1,9 +1,9 @@
 /**
  * Apple-style Audio Player with Waveform Display
- * Uses expo-audio for playback (replaces deprecated expo-av).
+ * Uses expo-audio (SDK 54 API) for playback.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,13 +18,13 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
-  const player = useAudioPlayer(audio.uri);
+  const player = useAudioPlayer({ uri: audio.uri }, 500);
   const status = useAudioPlayerStatus(player);
 
   const isPlaying = status.playing;
-  const durationMs = status.duration * 1000 || audio.duration || 1;
+  const durationMs = (status.duration ?? 0) * 1000 || audio.duration || 1;
   const currentMs = (status.currentTime ?? 0) * 1000;
-  const progress = durationMs > 0 ? currentMs / durationMs : 0;
+  const progress = durationMs > 0 ? Math.min(currentMs / durationMs, 1) : 0;
 
   const togglePlayback = useCallback(() => {
     if (isPlaying) {
@@ -49,30 +49,23 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
           style={styles.compactGradient}
         >
           <View style={styles.compactPlayButton}>
-            <Icon
-              name={isPlaying ? 'pause' : 'play'}
-              size={IconSize.sm}
-              color={colors.accent}
-            />
+            <Icon name={isPlaying ? 'pause' : 'play'} size={IconSize.sm} color={colors.accent} />
           </View>
           <View style={styles.compactWaveform}>
-            {waveformBars.slice(0, 25).map((level, index) => {
-              const isPlayed = index / 25 <= progress;
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.compactBar,
-                    {
-                      height: `${Math.max(20, level * 100)}%`,
-                      backgroundColor: isPlayed
-                        ? 'rgba(255, 255, 255, 1)'
-                        : 'rgba(255, 255, 255, 0.5)',
-                    },
-                  ]}
-                />
-              );
-            })}
+            {waveformBars.slice(0, 25).map((level, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.compactBar,
+                  {
+                    height: `${Math.max(20, level * 100)}%`,
+                    backgroundColor: index / 25 <= progress
+                      ? 'rgba(255,255,255,1)'
+                      : 'rgba(255,255,255,0.4)',
+                  },
+                ]}
+              />
+            ))}
           </View>
           <Text style={styles.compactTime}>
             {formatDurationMs(isPlaying ? currentMs : audio.duration)}
@@ -85,38 +78,28 @@ export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
   return (
     <View style={styles.container}>
       <View style={styles.waveformContainer}>
-        {waveformBars.map((level, index) => {
-          const barProgress = index / waveformBars.length;
-          const isPlayed = barProgress <= progress;
-          return (
-            <View
-              key={index}
-              style={[
-                styles.bar,
-                {
-                  height: `${Math.max(15, level * 100)}%`,
-                  backgroundColor: isPlayed ? colors.accent : colors.surfaceTertiary,
-                },
-              ]}
-            />
-          );
-        })}
+        {waveformBars.map((level, index) => (
+          <View
+            key={index}
+            style={[
+              styles.bar,
+              {
+                height: `${Math.max(15, level * 100)}%`,
+                backgroundColor: index / waveformBars.length <= progress
+                  ? colors.accent
+                  : colors.surfaceTertiary,
+              },
+            ]}
+          />
+        ))}
       </View>
-
       <View style={styles.controls}>
         <Text style={styles.time}>{formatDurationMs(currentMs)}</Text>
         <Pressable
           onPress={togglePlayback}
-          style={({ pressed }) => [
-            styles.playButton,
-            pressed && styles.playButtonPressed,
-          ]}
+          style={({ pressed }) => [styles.playButton, pressed && styles.pressed]}
         >
-          <Icon
-            name={isPlaying ? 'pause' : 'play'}
-            size={IconSize.lg}
-            color={colors.textPrimary}
-          />
+          <Icon name={isPlaying ? 'pause' : 'play'} size={IconSize.lg} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.time}>{formatDurationMs(audio.duration)}</Text>
       </View>
@@ -138,11 +121,7 @@ const styles = StyleSheet.create({
     gap: 2,
     marginBottom: spacing.md,
   },
-  bar: {
-    width: 3,
-    borderRadius: 1.5,
-    minHeight: 4,
-  },
+  bar: { width: 3, borderRadius: 1.5, minHeight: 4 },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -162,15 +141,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  playButtonPressed: {
-    transform: [{ scale: 0.95 }],
-    opacity: 0.9,
-  },
-  compactContainer: {
-    flex: 1,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-  },
+  pressed: { transform: [{ scale: 0.95 }], opacity: 0.9 },
+  compactContainer: { flex: 1, borderRadius: borderRadius.lg, overflow: 'hidden' },
   compactGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -186,18 +158,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  compactWaveform: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 24,
-    gap: 2,
-  },
-  compactBar: {
-    flex: 1,
-    borderRadius: 1,
-    minHeight: 4,
-  },
+  compactWaveform: { flex: 1, flexDirection: 'row', alignItems: 'center', height: 24, gap: 2 },
+  compactBar: { flex: 1, borderRadius: 1, minHeight: 4 },
   compactTime: {
     fontSize: typography.sizes.xs,
     color: colors.textPrimary,

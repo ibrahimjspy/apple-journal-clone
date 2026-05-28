@@ -9,9 +9,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import {
   useAudioRecorder,
-  AudioModule,
   RecordingPresets,
   useAudioRecorderState,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
 } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '@/constants/theme';
@@ -41,7 +42,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
 
   useEffect(() => {
     (async () => {
-      const status = await AudioModule.requestRecordingPermissionsAsync();
+      const status = await requestRecordingPermissionsAsync();
       if (!status.granted) {
         showAlert('Permission needed', 'Please grant microphone access to record voice notes.');
       } else {
