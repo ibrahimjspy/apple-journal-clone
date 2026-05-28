@@ -4,6 +4,7 @@ export * from './AudioPlayer';
 export * from './AudioTile';
 export * from './CardImageGrid';
 export * from './BottomSheet';
+export * from './ActionSheet';
 export * from './MediaToolbar';
 export * from './ContentBlockRenderer';
 export * from './AudioRecorderModal';

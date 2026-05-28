@@ -93,6 +93,30 @@ export async function updateEntry(id: string, updates: Partial<JournalEntryDraft
   }
 }
 
+/**
+ * Toggles the bookmark flag on an entry.
+ * Returns the new bookmark state, or null if the entry doesn't exist.
+ */
+export async function toggleBookmark(id: string): Promise<boolean | null> {
+  try {
+    const entries = await getEntries();
+    const index = entries.findIndex(e => e.id === id);
+    if (index === -1) return null;
+
+    const newState = !entries[index].isBookmarked;
+    entries[index] = {
+      ...entries[index],
+      isBookmarked: newState,
+      updatedAt: new Date().toISOString(),
+    };
+    await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
+    return newState;
+  } catch (error) {
+    console.error('Error toggling bookmark:', error);
+    return null;
+  }
+}
+
 /** Deletes an entry and its associated media files from local storage. */
 export async function deleteEntry(id: string): Promise<boolean> {
   try {

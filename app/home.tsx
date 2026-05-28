@@ -10,8 +10,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { colors, spacing, typography, borderRadius, shadows, fonts } from '@/constants/theme';
 import { Icon, JournalBrandIcon, FilterIcon, IconSize } from '@/components/Icons';
-import { AudioTile, CreateEntrySheet, ViewEntrySheet, CardImageGrid } from '@/components';
-import { getEntries, deleteEntry, formatDate } from '@/services/storage';
+import { AudioTile, CreateEntrySheet, ViewEntrySheet, CardImageGrid, ActionSheet, ActionSheetItem } from '@/components';
+import { getEntries, deleteEntry, toggleBookmark, formatDate } from '@/services/storage';
 import { JournalEntry } from '@/types/journal';
 import { confirmAction } from '@/utils/alert';
 
@@ -134,11 +134,11 @@ export default function HomeScreen() {
             }
           >
             {filteredEntries.map((entry) => (
-              <JournalCard 
-                key={entry.id} 
-                entry={entry} 
+              <JournalCard
+                key={entry.id}
+                entry={entry}
                 onPress={() => setSelectedEntry(entry)}
-                onDelete={loadEntries} 
+                onChange={loadEntries}
               />
             ))}
           </ScrollView>
@@ -200,67 +200,116 @@ function EmptyState() {
   );
 }
 
-function JournalCard({ entry, onPress, onDelete }: { entry: JournalEntry; onPress: () => void; onDelete: () => void }) {
+interface JournalCardProps {
+  entry: JournalEntry;
+  onPress: () => void;
+  /** Called after any mutation (delete, bookmark toggle) to refresh the list. */
+  onChange: () => void;
+}
+
+function JournalCard({ entry, onPress, onChange }: JournalCardProps) {
+  const [showActions, setShowActions] = useState(false);
   const images = entry.previewImages || [];
   const audioBlock = entry.content.find(block => block.type === 'audio' && block.audioData);
 
-  const handleMorePress = () => {
+  const handleBookmark = useCallback(async () => {
+    await toggleBookmark(entry.id);
+    onChange();
+  }, [entry.id, onChange]);
+
+  const handleDelete = useCallback(() => {
     confirmAction(
       {
         title: 'Delete Entry',
-        message: 'Are you sure you want to delete this entry?',
+        message: 'Are you sure? This cannot be undone.',
         confirmText: 'Delete',
         destructive: true,
       },
       async () => {
         await deleteEntry(entry.id);
-        onDelete();
+        onChange();
       }
     );
-  };
+  }, [entry.id, onChange]);
+
+  const actions: ActionSheetItem[] = useMemo(() => [
+    {
+      id: 'bookmark',
+      label: entry.isBookmarked ? 'Remove Bookmark' : 'Bookmark',
+      icon: entry.isBookmarked ? 'bookmark' : 'bookmark-outline',
+      onPress: handleBookmark,
+    },
+    {
+      id: 'delete',
+      label: 'Delete Entry',
+      icon: 'trash-outline',
+      destructive: true,
+      onPress: handleDelete,
+    },
+  ], [entry.isBookmarked, handleBookmark, handleDelete]);
 
   return (
-    <Pressable 
-      style={({ pressed }) => [
-        styles.card,
-        pressed && styles.cardPressed
-      ]}
-      onPress={onPress}
-    >
-      {/* Adaptive image grid (returns null when no images) */}
-      {images.length > 0 && (
-        <View style={styles.imageGridWrapper}>
-          <CardImageGrid images={images} />
+    <>
+      <Pressable
+        style={({ pressed }) => [
+          styles.card,
+          pressed && styles.cardPressed,
+        ]}
+        onPress={onPress}
+      >
+        {/* Bookmark indicator */}
+        {entry.isBookmarked && (
+          <View style={styles.bookmarkIndicator}>
+            <Icon name="bookmark" size={14} color={colors.accent} />
+          </View>
+        )}
+
+        {/* Adaptive image grid (returns null when no images) */}
+        {images.length > 0 && (
+          <View style={styles.imageGridWrapper}>
+            <CardImageGrid images={images} />
+          </View>
+        )}
+
+        {/* Title */}
+        {entry.title ? (
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {entry.title}
+          </Text>
+        ) : null}
+
+        {/* Content */}
+        {entry.previewText ? (
+          <Text style={styles.cardContent} numberOfLines={entry.title ? 2 : 4}>
+            {entry.previewText}
+          </Text>
+        ) : null}
+
+        {/* Audio Tile - Apple Style */}
+        {audioBlock?.audioData && (
+          <AudioTile audio={audioBlock.audioData} />
+        )}
+
+        {/* Footer */}
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardDate}>{formatDate(entry.createdAt)}</Text>
+          <Pressable
+            testID="entry-more-button"
+            style={styles.moreButton}
+            onPress={() => setShowActions(true)}
+            hitSlop={12}
+          >
+            <Icon name="ellipsis-horizontal" size={IconSize.sm} color={colors.textTertiary} />
+          </Pressable>
         </View>
-      )}
+      </Pressable>
 
-      {/* Title */}
-      {entry.title ? (
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {entry.title}
-        </Text>
-      ) : null}
-
-      {/* Content */}
-      {entry.previewText ? (
-        <Text style={styles.cardContent} numberOfLines={entry.title ? 2 : 4}>
-          {entry.previewText}
-        </Text>
-      ) : null}
-
-      {/* Audio Tile - Apple Style */}
-      {audioBlock?.audioData && (
-        <AudioTile audio={audioBlock.audioData} />
-      )}
-
-      {/* Footer */}
-      <View style={styles.cardFooter}>
-        <Text style={styles.cardDate}>{formatDate(entry.createdAt)}</Text>
-        <Pressable testID="entry-more-button" style={styles.moreButton} onPress={handleMorePress}>
-          <Icon name="ellipsis-horizontal" size={IconSize.sm} color={colors.textTertiary} />
-        </Pressable>
-      </View>
-    </Pressable>
+      <ActionSheet
+        visible={showActions}
+        items={actions}
+        onClose={() => setShowActions(false)}
+      />
+    </>
   );
 }
 
@@ -369,6 +418,18 @@ const styles = StyleSheet.create({
   },
   imageGridWrapper: {
     marginBottom: spacing.sm,
+  },
+  bookmarkIndicator: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 1,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.accentSoft,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardTitle: {
     fontSize: typography.sizes.lg,

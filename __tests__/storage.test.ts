@@ -15,6 +15,7 @@ import {
   createEntry,
   updateEntry,
   deleteEntry,
+  toggleBookmark,
   formatDate,
 } from '../services/storage';
 
@@ -124,6 +125,42 @@ describe('updateEntry', () => {
     mockedStorage.getItem.mockResolvedValue(JSON.stringify([]));
     const result = await updateEntry('missing', { title: 'Nope' });
     expect(result).toBeNull();
+  });
+});
+
+describe('toggleBookmark', () => {
+  it('sets isBookmarked=true for an unbookmarked entry', async () => {
+    const entries = [{ id: '1', content: [], createdAt: '2024-01-01T00:00:00Z' }];
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify(entries));
+    mockedStorage.setItem.mockResolvedValue(undefined);
+
+    const result = await toggleBookmark('1');
+
+    expect(result).toBe(true);
+    const saved = JSON.parse(mockedStorage.setItem.mock.calls[0][1] as string);
+    expect(saved[0].isBookmarked).toBe(true);
+    expect(saved[0].updatedAt).toBeTruthy();
+  });
+
+  it('sets isBookmarked=false for a bookmarked entry', async () => {
+    const entries = [
+      { id: '1', content: [], createdAt: '2024-01-01T00:00:00Z', isBookmarked: true },
+    ];
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify(entries));
+    mockedStorage.setItem.mockResolvedValue(undefined);
+
+    const result = await toggleBookmark('1');
+
+    expect(result).toBe(false);
+    const saved = JSON.parse(mockedStorage.setItem.mock.calls[0][1] as string);
+    expect(saved[0].isBookmarked).toBe(false);
+  });
+
+  it('returns null when entry does not exist', async () => {
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify([]));
+    const result = await toggleBookmark('missing');
+    expect(result).toBeNull();
+    expect(mockedStorage.setItem).not.toHaveBeenCalled();
   });
 });
 

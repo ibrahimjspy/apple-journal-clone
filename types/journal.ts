@@ -52,6 +52,8 @@ export interface JournalEntry {
   content: ContentBlock[];
   createdAt: string;
   updatedAt: string;
+  /** Whether the user has bookmarked this entry. */
+  isBookmarked?: boolean;
   previewText?: string;
   previewImages?: string[];
   hasAudio?: boolean;
