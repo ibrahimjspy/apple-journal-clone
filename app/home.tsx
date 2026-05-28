@@ -90,6 +90,7 @@ export default function HomeScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={styles.filterScroll}
             contentContainerStyle={styles.filterRow}
           >
             {FILTERS.map(({ id, label, icon }) => {
@@ -291,15 +292,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  filterScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: spacing.md,
+  },
   filterRow: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
     gap: spacing.sm,
     flexDirection: 'row',
+    alignItems: 'center',
   },
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
