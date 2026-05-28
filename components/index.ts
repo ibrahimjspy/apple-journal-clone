@@ -2,6 +2,7 @@ export * from './Icons';
 export * from './AudioRecorder';
 export * from './AudioPlayer';
 export * from './AudioTile';
+export * from './CardImageGrid';
 export * from './BottomSheet';
 export * from './MediaToolbar';
 export * from './ContentBlockRenderer';
