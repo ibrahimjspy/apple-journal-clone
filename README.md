@@ -3,7 +3,7 @@
 > An open-source Apple Journal clone for Android users who deserve a beautiful journaling experience.
 
 ![Platform](https://img.shields.io/badge/platform-Android-green)
-![Framework](https://img.shields.io/badge/framework-Expo%20React%20Native-blue)
+![Framework](https://img.shields.io/badge/framework-Expo%20SDK%2054-blue)
 ![License](https://img.shields.io/badge/license-MIT-purple)
 
 ---
@@ -25,46 +25,39 @@ This project brings the elegant, focused journaling experience of Apple Journal 
 ### Local-First. Your Data is Yours.
 
 ```
-┌─────────────────────────────────────────┐
-│         Apple Journal Clone             │
-├─────────────────────────────────────────┤
-│  AsyncStorage (entries metadata)        │
-│  Device Storage (images & audio files)  │
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                  Apple Journal Clone                       │
+├────────────────────────────────────────────────────────────┤
+│  AsyncStorage         — entries metadata (single JSON key) │
+│  Document directory   — image & audio files                │
+│  Storage Access Fwk   — exports/imports to user folders    │
+└────────────────────────────────────────────────────────────┘
 ```
 
-- **No backend API** — Everything runs on-device
-- **No database servers** — We don't store your journals
-- **Local file storage** — Images and audio are saved to the app's persistent document directory
-- **AsyncStorage** — Entry metadata and content blocks
+- **No backend API.** Everything runs on-device.
+- **Local file storage.** Images and audio live in the app's persistent document directory.
+- **Manual cloud-free backups.** Settings → Backup exports a browsable `AppleJournal/` folder you can copy to another phone or to Google Drive yourself.
 
 ---
 
 ## Features
 
 ### Journal Feed
-- Beautiful entry cards in a scrollable feed
-- Dark theme (Apple-inspired aesthetic)
-- Image grid previews on cards
-- Audio tiles with waveform visualization
-- Filter by: All, With Photos, With Audio
+- Beautiful entry cards in a scrollable feed (dark theme, Apple-inspired)
+- Smart adaptive image grids (1/2/3/4/5+ patterns) on cards
+- Audio tile per entry with waveform playback (and a "+N more" badge for multi-recording entries)
+- Filter by: **All**, **Photos**, **Audio**
+- Pull to refresh, three-dots action sheet (Bookmark / Delete)
 
-### Journal Entry Creation
-| Feature | Description |
-|---------|-------------|
-| **Title** | Optional title for each entry |
-| **Text** | Plain text content blocks |
-| **Images** | Pick from gallery (multi-select) or take with camera — persisted to local storage |
-| **Audio** | Tap-to-record with live waveform, pause/resume, inline playback |
+### Create / Edit
+- Optional title + plain text content blocks
+- Add images from gallery (multi-select) or camera
+- Voice notes with **pause/resume**, live waveform from real metering, and inline playback
+- Bookmark toggle, delete with confirmation
 
-### Audio Journaling
-The audio experience is what sets Apple Journal apart. We've replicated:
-- Tap-to-record simplicity
-- Pause and resume while recording
-- Visual waveform feedback (real-time metering)
-- Compact and full waveform playback
-- Inline audio players in entries
-- Audio tiles on home cards with animated bars
+### Backup (Android)
+- **Export to Folder** — picks a user-chosen directory (via SAF) and writes one folder per entry containing `entry.json`, `content.md`, and `images/` + `audio/` files
+- **Restore from Folder** — reads a previously exported folder and **merges** entries (never overwrites existing ones)
 
 ---
 
@@ -72,13 +65,17 @@ The audio experience is what sets Apple Journal apart. We've replicated:
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Expo SDK 52 + React Native 0.76 |
-| Language | TypeScript |
-| Routing | expo-router (file-based) |
-| Storage | AsyncStorage (metadata) + expo-file-system (media) |
-| Audio | expo-av (record + playback) |
-| Images | expo-image-picker |
-| Theme | Dark mode only (for now) |
+| Framework | Expo SDK 54 + React Native 0.81 + React 19.1 |
+| Language | TypeScript (strict) |
+| Routing | `expo-router` (file-based) |
+| Metadata storage | `@react-native-async-storage/async-storage` |
+| Media storage | `expo-file-system/legacy` |
+| Backup I/O | `expo-file-system` `StorageAccessFramework` |
+| Audio | `expo-audio` (record + playback) |
+| Images | `expo-image-picker` |
+| Fonts | Inter via `@expo-google-fonts/inter` (closest open match to SF Pro) |
+| Tests | Jest + `jest-expo` + `@testing-library/react-native` |
+| Theme | Dark mode (only) |
 
 ---
 
@@ -86,41 +83,62 @@ The audio experience is what sets Apple Journal apart. We've replicated:
 
 | Feature | Why Not |
 |---------|---------|
-| Cloud sync / Google Drive | Keeping V1 simple and local-only |
-| Rich text editing | Adds complexity, journals should be simple |
-| Social features | This is personal journaling |
-| Premium tier | Forever free, forever open |
+| Cloud sync (Drive / iCloud) | Local-only V1; folder export covers backup needs |
+| Rich text editing | Apple Journal is plain text + blocks; we follow suit |
+| iOS native build | Android-first; SAF backup has no iOS equivalent |
+| Transcription | Future — would need on-device ML model |
+| Multiple journals | Future — single journal in V1 |
+| Lock / passcode | Future — would use Android Keystore |
 
 ---
 
 ## Getting Started
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/apple-journal-clone.git
+git clone https://github.com/ibrahimjspy/apple-journal-clone.git
 cd apple-journal-clone
 
-# Install dependencies
-npm install
+npm install --legacy-peer-deps
 
-# Start the Expo development server
+# Start dev server, then scan QR with Expo Go on your Android phone
 npx expo start
 
-# Run on Android
+# Or build a native development client (needs JDK 17 + Android Studio)
 npx expo run:android
 ```
 
 ---
 
-## Contributing
+## Tests
 
-We welcome contributions! Whether it's:
-- Bug fixes
-- Feature implementations
-- Design improvements
-- Documentation
+```bash
+npm test                  # full Jest suite
+npx jest <pattern>        # filter
+```
 
-Please read our contributing guidelines before submitting PRs.
+91 unit tests across 7 suites covering storage CRUD (including
+corrupt-storage guards and merge semantics), media file persistence,
+backup format serializers, layout planners, and shared utilities.
+
+End-to-end flows for Maestro live in `.maestro/`. Running them needs
+Android Studio + Java + a connected device.
+
+---
+
+## Project Conventions
+
+If you plan to contribute or extend this app, **read `CLAUDE.md`** first —
+it documents the module boundaries (`utils/` is pure, `services/` does
+I/O, components depend on both via `@/` alias), key conventions
+(JSDoc on why-not-what, theme tokens for all spacing/colours/fonts),
+and the hard-won lessons around `expo-audio` versioning, SDK-54
+file-system migration, and bottom-sheet keyboard handling inside
+React Native Modals.
+
+The repo also ships two Cursor-skill workflows used to vet recent work:
+- `.cursor/skills/refactor/` — 8-phase systematic refactoring
+- (`~/.cursor/skills/productionalise/` + `~/.cursor/skills/bug-hunter/`
+  are global skills the maintainer uses pre-release)
 
 ---
 
@@ -134,7 +152,9 @@ MIT License — Use it, fork it, make it yours.
 
 > "The best journal is the one you actually use."
 
-We're not trying to build the most feature-rich journaling app. We're building one that's **beautiful enough to open daily** and **simple enough to actually write in**.
+We're not trying to build the most feature-rich journaling app. We're
+building one that's **beautiful enough to open daily** and **simple
+enough to actually write in**.
 
 ---
 

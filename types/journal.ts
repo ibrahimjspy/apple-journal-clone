@@ -59,6 +59,6 @@ export interface JournalEntry {
   hasAudio?: boolean;
 }
 
-/** Draft shape used when creating or updating an entry (server generates id/timestamps). */
+/** Draft shape used when creating or updating an entry; the storage layer assigns id and timestamps on save. */
 export type JournalEntryDraft = Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>;
 

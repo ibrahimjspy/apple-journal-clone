@@ -144,10 +144,4 @@ export const shadows = {
   },
 } as const;
 
-// Card dimensions
-export const cardLayout = {
-  imageGridGap: 2,
-  maxVisibleImages: 5,
-  primaryImageRatio: 0.6, // 60% width for main image
-} as const;
 

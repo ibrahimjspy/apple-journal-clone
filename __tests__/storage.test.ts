@@ -16,6 +16,7 @@ import {
   updateEntry,
   deleteEntry,
   toggleBookmark,
+  mergeEntries,
   formatDate,
   CorruptStorageError,
 } from '../services/storage';
@@ -226,21 +227,83 @@ describe('deleteEntry', () => {
   });
 });
 
+describe('mergeEntries', () => {
+  it('adds new entries that do not collide with existing ids', async () => {
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify([
+      { id: 'a', content: [], createdAt: '2024-01-01T00:00:00Z' },
+    ]));
+    mockedStorage.setItem.mockResolvedValue(undefined);
+
+    const incoming = [
+      { id: 'b', title: '', content: [], createdAt: '2024-02-01T00:00:00Z', updatedAt: '2024-02-01T00:00:00Z' },
+      { id: 'c', title: '', content: [], createdAt: '2024-03-01T00:00:00Z', updatedAt: '2024-03-01T00:00:00Z' },
+    ];
+    const result = await mergeEntries(incoming);
+    expect(result).toEqual({ added: 2, skipped: 0 });
+
+    const saved = JSON.parse(mockedStorage.setItem.mock.calls[0][1] as string);
+    expect(saved).toHaveLength(3);
+    // Sorted newest-first
+    expect(saved.map((e: any) => e.id)).toEqual(['c', 'b', 'a']);
+  });
+
+  it('skips incoming entries whose ids already exist (no overwrite)', async () => {
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify([
+      { id: 'a', title: 'original', content: [], createdAt: '2024-01-01T00:00:00Z' },
+    ]));
+    mockedStorage.setItem.mockResolvedValue(undefined);
+
+    const result = await mergeEntries([
+      { id: 'a', title: 'IMPOSTER', content: [], createdAt: '2024-02-01T00:00:00Z', updatedAt: '2024-02-01T00:00:00Z' },
+    ]);
+    expect(result).toEqual({ added: 0, skipped: 1 });
+    // Original was not modified — no write needed
+    expect(mockedStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('reports mixed added/skipped when only some incoming ids collide', async () => {
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify([
+      { id: 'a', content: [], createdAt: '2024-01-01T00:00:00Z' },
+    ]));
+    mockedStorage.setItem.mockResolvedValue(undefined);
+
+    const result = await mergeEntries([
+      { id: 'a', title: '', content: [], createdAt: '2024-02-01T00:00:00Z', updatedAt: '2024-02-01T00:00:00Z' },
+      { id: 'b', title: '', content: [], createdAt: '2024-02-01T00:00:00Z', updatedAt: '2024-02-01T00:00:00Z' },
+    ]);
+    expect(result).toEqual({ added: 1, skipped: 1 });
+  });
+});
+
 describe('formatDate', () => {
-  it('returns "Today" for current date', () => {
-    const now = new Date().toISOString();
-    expect(formatDate(now)).toBe('Today');
+  // Pin "now" to a fixed local-noon timestamp so tests are deterministic
+  // regardless of when CI runs or what timezone the host is in.
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 4, 28, 12, 0, 0)); // May 28 2026, 12:00 local
+  });
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
-  it('returns "Yesterday" for one day ago', () => {
-    const yesterday = new Date(Date.now() - 86400000).toISOString();
-    expect(formatDate(yesterday)).toBe('Yesterday');
+  it('returns "Today" when the entry was created earlier in the same calendar day', () => {
+    const earlierToday = new Date(2026, 4, 28, 1, 0, 0).toISOString();
+    expect(formatDate(earlierToday)).toBe('Today');
   });
 
-  it('returns weekday name for recent dates', () => {
-    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
+  it('returns "Yesterday" for the previous calendar day even when less than 24h apart', () => {
+    // 23:00 yesterday → only 13h before "now" but a different calendar day
+    const lateYesterday = new Date(2026, 4, 27, 23, 0, 0).toISOString();
+    expect(formatDate(lateYesterday)).toBe('Yesterday');
+  });
+
+  it('returns a weekday name for entries within the past week', () => {
+    const threeDaysAgo = new Date(2026, 4, 25, 10, 0, 0).toISOString();
     const result = formatDate(threeDaysAgo);
-    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    expect(weekdays).toContain(result);
+    expect(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']).toContain(result);
+  });
+
+  it('returns full date for entries older than a week', () => {
+    const twoWeeksAgo = new Date(2026, 4, 14, 10, 0, 0).toISOString();
+    expect(formatDate(twoWeeksAgo)).toMatch(/[A-Z][a-z]+,\s+[A-Z][a-z]+\s+\d+/);
   });
 });

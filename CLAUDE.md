@@ -64,21 +64,21 @@ components/                Presentational + container components
 └── index.ts                 Barrel — only exports symbols actually consumed
 
 services/                  Side-effectful logic (storage, file I/O, audio)
-├── storage.ts               AsyncStorage CRUD + mergeEntries + toggleBookmark
+├── storage.ts               AsyncStorage CRUD + mergeEntries + toggleBookmark, throws CorruptStorageError
 ├── media.ts                 Persistent media file save/delete (legacy file system)
 ├── backup.ts                PURE serializers for backup format (no I/O, fully unit-tested)
-├── exportImport.ts          SAF-based export/import using backup.ts helpers
-└── index.ts                 Barrel
+└── exportImport.ts          SAF-based export/import using backup.ts helpers
 
 utils/                     Pure helpers (no React, no native deps, all unit-tested)
 ├── alert.ts                 Cross-platform Alert / Confirm
 ├── id.ts                    generateId() — timestamp + random
 ├── time.ts                  formatDurationMs / formatDurationSecs
 ├── imageGrid.ts             planImageGrid() — picks layout pattern by image count
-└── slugify.ts               slugify() + buildEntryFolderName() for backup folders
+└── slugify.ts               slugify() + buildEntryFolderName() for backup folders (id-suffixed to avoid collisions)
 
 constants/
-└── theme.ts                 colors, spacing, borderRadius, typography, fonts, shadows
+├── theme.ts                 colors, spacing, borderRadius, typography, fonts, shadows
+└── app.ts                   app-wide numeric/string constants (preview caps, audio intervals, etc.)
 
 types/
 └── journal.ts               JournalEntry, ContentBlock, AudioEntry, ImageEntry
@@ -268,13 +268,13 @@ npx jest --watch                  # watch mode
 | Suite | Tests | Focus |
 |-------|------:|-------|
 | `utils.test.ts` | 9 | id generation, duration formatting |
-| `slugify.test.ts` | 14 | slug edge cases, folder name format |
+| `slugify.test.ts` | 16 | slug edge cases, folder name uniqueness via id suffix |
 | `imageGrid.test.ts` | 9 | layout pattern per image count |
 | `backup.test.ts` | 24 | manifest + entry.json + markdown serializers, parser validation, round-trips |
-| `storage.test.ts` | 14 | CRUD, bookmark toggle, merge, date formatting |
+| `storage.test.ts` | 23 | CRUD, corrupt-storage guard, deleteEntry ordering, bookmark toggle, merge semantics, calendar-day date formatting |
 | `media.test.ts` | 9 | image/audio persistence, delete safety |
-| `LoginScreen.test.tsx` | 1 | index redirects to /home |
-| **Total** | **80** | All passing |
+| `IndexRedirect.test.tsx` | 1 | index redirects to /home |
+| **Total** | **91** | All passing |
 
 ### E2E (Maestro)
 Flows in `.maestro/` cover home loads, create entry, view/edit, delete,

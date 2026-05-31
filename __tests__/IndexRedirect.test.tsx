@@ -10,7 +10,7 @@ jest.mock('expo-router', () => ({
 import Index from '../app/index';
 
 describe('Index (entry point)', () => {
-  it('redirects to home', () => {
+  it('redirects to /home', () => {
     const { getByText } = render(<Index />);
     expect(getByText('Redirect to /home')).toBeTruthy();
   });
