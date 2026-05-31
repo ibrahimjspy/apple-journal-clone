@@ -12,7 +12,7 @@ import {
   ScrollView, 
   Pressable,
 } from 'react-native';
-import { colors, spacing, typography } from '@/constants/theme';
+import { colors, spacing, typography, fonts } from '@/constants/theme';
 import { Icon, IconSize } from './Icons';
 import { BottomSheet } from './BottomSheet';
 import { MediaToolbar } from './MediaToolbar';
@@ -64,7 +64,16 @@ export function ViewEntrySheet({ entry, visible, onClose, onUpdated, onDeleted }
 
     setIsSaving(true);
     try {
-      await updateEntry(entry.id, { title: entryTitle.trim(), content: getFilteredContent() });
+      const result = await updateEntry(entry.id, {
+        title: entryTitle.trim(),
+        content: getFilteredContent(),
+      });
+      if (result === null) {
+        // updateEntry never throws; null means not-found or storage error.
+        // Do NOT exit edit mode — user keeps their unsaved work.
+        showAlert('Error', 'Failed to save changes. Please try again.');
+        return;
+      }
       setIsEditing(false);
       onUpdated();
     } catch (error) {
@@ -218,12 +227,12 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: typography.sizes.md,
-    fontWeight: typography.weights.medium,
+    fontFamily: fonts.medium,
     color: colors.textPrimary,
   },
   doneText: {
     fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.semibold,
+    fontFamily: fonts.semibold,
     color: colors.accent,
     textAlign: 'right',
   },
@@ -232,7 +241,7 @@ const styles = StyleSheet.create({
   },
   editText: {
     fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.medium,
+    fontFamily: fonts.medium,
     color: colors.accent,
     textAlign: 'right',
   },
@@ -248,14 +257,14 @@ const styles = StyleSheet.create({
   },
   titleInput: {
     fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
+    fontFamily: fonts.bold,
     color: colors.textPrimary,
     marginBottom: spacing.sm,
     padding: 0,
   },
   titleText: {
     fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
+    fontFamily: fonts.bold,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },

@@ -14,6 +14,7 @@ import { colors, spacing, borderRadius, typography, fonts } from '@/constants/th
 import { Icon, IconSize } from './Icons';
 import { AudioEntry } from '@/types/journal';
 import { formatDurationMs } from '@/utils/time';
+import { AUDIO_STATUS_INTERVAL_MS } from '@/constants/app';
 
 interface AudioPlayerProps {
   audio: AudioEntry;
@@ -21,7 +22,7 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ audio, compact = false }: AudioPlayerProps) {
-  const player = useAudioPlayer({ uri: audio.uri }, { updateInterval: 500 });
+  const player = useAudioPlayer({ uri: audio.uri }, { updateInterval: AUDIO_STATUS_INTERVAL_MS });
   const status = useAudioPlayerStatus(player);
 
   const isPlaying = status.playing;

@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, borderRadius, spacing } from '@/constants/theme';
+import { BOTTOM_SHEET_HEIGHT_RATIO } from '@/constants/app';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,7 +28,7 @@ interface BottomSheetProps {
   height?: number;
 }
 
-export function BottomSheet({ visible, onClose, children, height = 0.85 }: BottomSheetProps) {
+export function BottomSheet({ visible, onClose, children, height = BOTTOM_SHEET_HEIGHT_RATIO }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -119,7 +120,7 @@ export function BottomSheet({ visible, onClose, children, height = 0.85 }: Botto
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.scrim,
   },
   sheet: {
     position: 'absolute',

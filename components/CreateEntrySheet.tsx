@@ -12,8 +12,7 @@ import {
   ScrollView, 
   Pressable,
 } from 'react-native';
-import { colors, spacing, typography } from '@/constants/theme';
-import { Icon, IconSize } from './Icons';
+import { colors, spacing, typography, fonts } from '@/constants/theme';
 import { BottomSheet } from './BottomSheet';
 import { MediaToolbar } from './MediaToolbar';
 import { ContentBlockRenderer } from './ContentBlockRenderer';
@@ -33,6 +32,9 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
   const [isSaving, setIsSaving] = useState(false);
   const [title, setTitle] = useState('');
   const textInputRef = useRef<TextInput>(null);
+  // savingRef guards against double-tap creating duplicate entries before
+  // the async setIsSaving has had a chance to flip and disable the button.
+  const savingRef = useRef(false);
   
   const {
     contentBlocks,
@@ -68,11 +70,13 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
 
   // Save entry
   const handleDone = useCallback(async () => {
+    if (savingRef.current) return; // double-tap guard
     if (!hasContent()) {
       handleClose();
       return;
     }
 
+    savingRef.current = true;
     setIsSaving(true);
     try {
       const draft: JournalEntryDraft = {
@@ -87,6 +91,7 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
       console.error('Error saving entry:', error);
       showAlert('Error', 'Failed to save entry. Please try again.');
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
   }, [hasContent, getFilteredContent, onSaved, title, handleClose]);
@@ -122,21 +127,29 @@ export function CreateEntrySheet({ visible, onClose, onSaved }: CreateEntrySheet
       <BottomSheet visible={visible} onClose={handleCancel}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={handleCancel} style={styles.headerButton}>
-            <Icon name="bookmark-outline" size={IconSize.md} color={colors.accent} />
+          <Pressable
+            onPress={handleCancel}
+            style={styles.headerButton}
+            accessibilityLabel="Cancel"
+            accessibilityRole="button"
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
           
           <View style={styles.headerCenter}>
             <Text style={styles.dateText}>{getCurrentDate()}</Text>
           </View>
           
-          <Pressable 
-            onPress={handleDone} 
+          <Pressable
+            onPress={handleDone}
             style={styles.headerButton}
             disabled={isSaving}
+            accessibilityLabel="Save entry"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isSaving }}
           >
             <Text style={[styles.doneText, isSaving && styles.doneTextDisabled]}>
-              Done
+              {isSaving ? 'Saving…' : 'Done'}
             </Text>
           </Pressable>
         </View>
@@ -205,14 +218,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  dateText: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.medium,
-    color: colors.textPrimary,
+  cancelText: {
+    fontSize: typography.sizes.lg,
+    fontFamily: fonts.regular,
+    color: colors.accent,
   },
   doneText: {
     fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.semibold,
+    fontFamily: fonts.semibold,
     color: colors.accent,
     textAlign: 'right',
   },
@@ -231,9 +244,14 @@ const styles = StyleSheet.create({
   },
   titleInput: {
     fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold,
+    fontFamily: fonts.bold,
     color: colors.textPrimary,
     marginBottom: spacing.sm,
     padding: 0,
+  },
+  dateText: {
+    fontSize: typography.sizes.md,
+    fontFamily: fonts.medium,
+    color: colors.textPrimary,
   },
 });

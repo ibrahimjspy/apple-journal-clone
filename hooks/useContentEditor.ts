@@ -11,8 +11,9 @@ import { useState, useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { ContentBlock, AudioEntry } from '@/types/journal';
 import { generateId } from '@/utils/id';
-import { saveImageToLocal, saveAudioToLocal } from '@/services/media';
+import { saveImageToLocal, saveAudioToLocal, deleteMediaFile } from '@/services/media';
 import { showAlert } from '@/utils/alert';
+import { IMAGE_PICKER_QUALITY } from '@/constants/app';
 
 export function useContentEditor(initialContent: ContentBlock[] = []) {
   const [contentBlocks, setContentBlocks] = useState<ContentBlock[]>(
@@ -49,7 +50,7 @@ export function useContentEditor(initialContent: ContentBlock[] = []) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      quality: 0.8,
+      quality: IMAGE_PICKER_QUALITY,
     });
 
     if (!result.canceled && result.assets.length > 0) {
@@ -87,7 +88,7 @@ export function useContentEditor(initialContent: ContentBlock[] = []) {
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    const result = await ImagePicker.launchCameraAsync({ quality: IMAGE_PICKER_QUALITY });
 
     if (!result.canceled && result.assets.length > 0) {
       try {
@@ -133,9 +134,18 @@ export function useContentEditor(initialContent: ContentBlock[] = []) {
     setShowAudioRecorder(false);
   }, []);
 
-  // Remove content block
+  /**
+   * Remove a content block. If the block is image or audio, also deletes
+   * the underlying file from local storage so we don't leak disk usage
+   * every time the user removes media during editing.
+   */
   const removeBlock = useCallback((id: string) => {
     setContentBlocks(prev => {
+      const target = prev.find(b => b.id === id);
+      if (target && (target.type === 'image' || target.type === 'audio') && target.content) {
+        // Fire-and-forget: deleteMediaFile already swallows errors safely.
+        void deleteMediaFile(target.content);
+      }
       const filtered = prev.filter(block => block.id !== id);
       if (filtered.length === 0 || !filtered.some(b => b.type === 'text')) {
         return [...filtered, { id: generateId(), type: 'text', content: '' }];

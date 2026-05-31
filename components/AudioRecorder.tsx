@@ -22,8 +22,13 @@ import { generateId } from '@/utils/id';
 import { formatDurationSecs } from '@/utils/time';
 import { showAlert } from '@/utils/alert';
 import { AudioEntry } from '@/types/journal';
+import {
+  RECORDER_LIVE_BAR_COUNT,
+  STORED_WAVEFORM_SAMPLE_COUNT,
+  AUDIO_RECORDER_STATE_INTERVAL_MS,
+} from '@/constants/app';
 
-const NUM_BARS = 40;
+const NUM_BARS = RECORDER_LIVE_BAR_COUNT;
 
 interface AudioRecorderProps {
   onRecordingComplete: (audio: AudioEntry) => void;
@@ -37,7 +42,7 @@ const RECORDING_OPTIONS = {
 
 export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderProps) {
   const audioRecorder = useAudioRecorder(RECORDING_OPTIONS);
-  const recorderState = useAudioRecorderState(audioRecorder, 80);
+  const recorderState = useAudioRecorderState(audioRecorder, AUDIO_RECORDER_STATE_INTERVAL_MS);
 
   const [hasPermission, setHasPermission] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -163,7 +168,7 @@ export function AudioRecorder({ onRecordingComplete, onCancel }: AudioRecorderPr
       const uri = audioRecorder.uri;
       if (uri) {
         const samples = waveformSamples.current;
-        const targetLen = 50;
+        const targetLen = STORED_WAVEFORM_SAMPLE_COUNT;
         let waveform: number[];
         if (samples.length <= targetLen) {
           waveform = [...samples];

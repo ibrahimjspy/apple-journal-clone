@@ -84,9 +84,22 @@ export function ActionSheet({ visible, title, message, items, onClose }: ActionS
     }
   }, [visible, slideAnim, opacityAnim]);
 
+  // Guard against double-tap firing the action twice while the first
+  // invocation is still awaiting (delete/bookmark hit storage). Reset
+  // when the sheet hides so reopening works.
+  const inflight = useRef(false);
+  useEffect(() => {
+    if (!visible) inflight.current = false;
+  }, [visible]);
+
   const handleItemPress = async (item: ActionSheetItem) => {
-    await item.onPress();
-    onClose();
+    if (inflight.current) return;
+    inflight.current = true;
+    try {
+      await item.onPress();
+    } finally {
+      onClose();
+    }
   };
 
   return (
@@ -162,7 +175,7 @@ export function ActionSheet({ visible, title, message, items, onClose }: ActionS
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.scrim,
   },
   sheetWrapper: {
     position: 'absolute',

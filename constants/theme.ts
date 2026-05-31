@@ -46,16 +46,17 @@ export const colors = {
   // Overlays
   overlay: 'rgba(26, 22, 37, 0.8)',
   overlayLight: 'rgba(255, 255, 255, 0.05)',
-  
+
+  /** Dimmed scrim used behind bottom sheets and action sheets. */
+  scrim: 'rgba(0, 0, 0, 0.5)',
+
   // Badge colors
   badge: 'rgba(0, 0, 0, 0.5)',
-  
-  // Google brand color
-  googleBlue: '#4285F4',
-  googleRed: '#EA4335',
-  googleYellow: '#FBBC05',
-  googleGreen: '#34A853',
-  
+
+  /** Waveform / on-gradient white text used by AudioTile + AudioPlayer compact mode. */
+  waveformPlayed: 'rgba(255, 255, 255, 1)',
+  waveformUnplayed: 'rgba(255, 255, 255, 0.35)',
+
   // Empty state icon gradient
   iconGradient1: '#F97316', // Orange
   iconGradient2: '#EC4899', // Pink

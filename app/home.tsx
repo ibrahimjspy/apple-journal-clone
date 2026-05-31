@@ -1,19 +1,24 @@
 /**
- * Home Screen - Journal Entries List
- * Features bottom sheet for creating entries and audio tiles with waveforms
+ * Home Screen — the journal feed.
+ *
+ * Loads entries on focus, supports filter by All / With Photos / With Audio,
+ * pull-to-refresh, and surfaces the create-entry bottom sheet via a FAB.
+ * Each card has a three-dots menu (bookmark / delete via ActionSheet) and
+ * a single audio tile per entry (the first audio block — see the
+ * "1+ voice notes" badge for entries with multiple).
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, router } from 'expo-router';
 import { colors, spacing, typography, borderRadius, shadows, fonts } from '@/constants/theme';
 import { Icon, JournalBrandIcon, FilterIcon, IconSize } from '@/components/Icons';
 import { AudioTile, CreateEntrySheet, ViewEntrySheet, CardImageGrid, ActionSheet, ActionSheetItem } from '@/components';
-import { getEntries, deleteEntry, toggleBookmark, formatDate } from '@/services/storage';
+import { getEntries, deleteEntry, toggleBookmark, formatDate, CorruptStorageError } from '@/services/storage';
 import { JournalEntry } from '@/types/journal';
-import { confirmAction } from '@/utils/alert';
+import { confirmAction, showAlert } from '@/utils/alert';
 
 type FilterType = 'all' | 'photos' | 'audio';
 
@@ -33,18 +38,34 @@ export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Load entries on focus
+  const insets = useSafeAreaInsets();
+
+  const loadEntries = useCallback(async () => {
+    try {
+      const data = await getEntries();
+      setEntries(data);
+    } catch (error) {
+      if (error instanceof CorruptStorageError) {
+        // Surface the bad state explicitly so the user knows their data is
+        // unreadable (rather than silently appearing as an empty journal,
+        // which would invite them to write new entries that overwrite it).
+        showAlert(
+          'Journal data corrupted',
+          'We could not read your saved entries. Please contact support before creating new entries (creating now may overwrite recoverable data).'
+        );
+      } else {
+        console.error('Failed to load entries:', error);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadEntries();
-    }, [])
+    }, [loadEntries])
   );
-
-  const loadEntries = useCallback(async () => {
-    const data = await getEntries();
-    setEntries(data);
-    setIsLoading(false);
-  }, []);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -56,7 +77,7 @@ export default function HomeScreen() {
     loadEntries();
   }, [loadEntries]);
 
-  const filteredEntries = useMemo(() => 
+  const filteredEntries = useMemo(() =>
     entries.filter((entry) => {
       if (activeFilter === 'photos') return (entry.previewImages?.length || 0) > 0;
       if (activeFilter === 'audio') return entry.hasAudio;
@@ -66,6 +87,7 @@ export default function HomeScreen() {
   );
 
   const hasEntries = entries.length > 0;
+  const hasFilteredEntries = filteredEntries.length > 0;
 
   return (
     <View style={styles.container}>
@@ -83,6 +105,9 @@ export default function HomeScreen() {
               style={styles.headerIconButton}
               onPress={() => setShowFilters(prev => !prev)}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter entries. Active filter: ${activeFilter}`}
+              accessibilityState={{ expanded: showFilters }}
             >
               <FilterIcon
                 size={22}
@@ -94,6 +119,8 @@ export default function HomeScreen() {
               style={styles.headerIconButton}
               onPress={() => router.push('/settings')}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
             >
               <Icon name="settings-outline" size={22} color={colors.textSecondary} />
             </Pressable>
@@ -106,6 +133,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             style={styles.filterScroll}
             contentContainerStyle={styles.filterRow}
+            accessibilityRole="tablist"
           >
             {FILTERS.map(({ id, label, icon }) => {
               const isActive = activeFilter === id;
@@ -114,6 +142,9 @@ export default function HomeScreen() {
                   key={id}
                   style={[styles.filterPill, isActive && styles.filterPillActive]}
                   onPress={() => setActiveFilter(id)}
+                  accessibilityRole="tab"
+                  accessibilityLabel={`Show ${label.toLowerCase()} entries`}
+                  accessibilityState={{ selected: isActive }}
                 >
                   <Icon
                     name={icon}
@@ -134,8 +165,16 @@ export default function HomeScreen() {
           </ScrollView>
         )}
 
-        {hasEntries ? (
-          <ScrollView 
+        {isLoading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : !hasEntries ? (
+          <EmptyState />
+        ) : !hasFilteredEntries ? (
+          <FilterEmptyState activeFilter={activeFilter} onClear={() => setActiveFilter('all')} />
+        ) : (
+          <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
@@ -156,19 +195,19 @@ export default function HomeScreen() {
               />
             ))}
           </ScrollView>
-        ) : (
-          <EmptyState />
         )}
 
-        {/* Floating Action Button */}
-        <View style={styles.fabContainer}>
-          <Pressable 
+        {/* Floating Action Button — bottom honours gesture-nav safe area */}
+        <View style={[styles.fabContainer, { bottom: Math.max(insets.bottom, spacing.md) + 16 }]}>
+          <Pressable
             style={({ pressed }) => [
               styles.fab,
-              pressed && styles.fabPressed
+              pressed && styles.fabPressed,
             ]}
             onPress={() => setShowCreateSheet(true)}
             testID="create-entry-fab"
+            accessibilityRole="button"
+            accessibilityLabel="Create new entry"
           >
             <LinearGradient
               colors={[colors.fabGradientStart, colors.fabGradientEnd]}
@@ -214,6 +253,33 @@ function EmptyState() {
   );
 }
 
+interface FilterEmptyStateProps {
+  activeFilter: FilterType;
+  onClear: () => void;
+}
+
+/** Shown when the user has entries but the active filter excludes all of them. */
+function FilterEmptyState({ activeFilter, onClear }: FilterEmptyStateProps) {
+  const label = FILTERS.find(f => f.id === activeFilter)?.label.toLowerCase() ?? activeFilter;
+  return (
+    <View style={styles.emptyState}>
+      <Icon name="search-outline" size={48} color={colors.textTertiary} />
+      <Text style={styles.emptyTitle}>No entries with {label}</Text>
+      <Text style={styles.emptySubtitle}>
+        Try a different filter or create a new entry.
+      </Text>
+      <Pressable
+        style={styles.emptyAction}
+        onPress={onClear}
+        accessibilityRole="button"
+        accessibilityLabel="Show all entries"
+      >
+        <Text style={styles.emptyActionText}>Show all entries</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 interface JournalCardProps {
   entry: JournalEntry;
   onPress: () => void;
@@ -224,7 +290,11 @@ interface JournalCardProps {
 function JournalCard({ entry, onPress, onChange }: JournalCardProps) {
   const [showActions, setShowActions] = useState(false);
   const images = entry.previewImages || [];
-  const audioBlock = entry.content.find(block => block.type === 'audio' && block.audioData);
+  // First audio block is shown inline; any extra ones surface as a "+N more"
+  // pill below the tile so multi-recording entries are discoverable.
+  const audioBlocks = entry.content.filter(b => b.type === 'audio' && b.audioData);
+  const audioBlock = audioBlocks[0];
+  const extraAudioCount = Math.max(0, audioBlocks.length - 1);
 
   const handleBookmark = useCallback(async () => {
     await toggleBookmark(entry.id);
@@ -303,6 +373,14 @@ function JournalCard({ entry, onPress, onChange }: JournalCardProps) {
         {audioBlock?.audioData && (
           <AudioTile audio={audioBlock.audioData} />
         )}
+        {extraAudioCount > 0 && (
+          <View style={styles.extraAudioPill}>
+            <Icon name="mic" size={12} color={colors.textSecondary} />
+            <Text style={styles.extraAudioText}>
+              {extraAudioCount} more voice {extraAudioCount === 1 ? 'note' : 'notes'}
+            </Text>
+          </View>
+        )}
 
         {/* Footer */}
         <View style={styles.cardFooter}>
@@ -312,6 +390,8 @@ function JournalCard({ entry, onPress, onChange }: JournalCardProps) {
             style={styles.moreButton}
             onPress={() => setShowActions(true)}
             hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Entry options"
           >
             <Icon name="ellipsis-horizontal" size={IconSize.sm} color={colors.textTertiary} />
           </Pressable>
@@ -402,12 +482,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: 100,
   },
+  // Loading state
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 100,
+  },
   // Empty State
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: 100,
+    paddingHorizontal: spacing.xl,
   },
   emptyTitle: {
     fontSize: typography.sizes.xl,
@@ -415,6 +503,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: typography.sizes.md,
@@ -422,6 +511,18 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  emptyAction: {
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.accent,
+  },
+  emptyActionText: {
+    fontSize: typography.sizes.md,
+    fontFamily: fonts.semibold,
+    color: colors.textPrimary,
   },
   // Journal Card
   card: {
@@ -477,10 +578,26 @@ const styles = StyleSheet.create({
   moreButton: {
     padding: spacing.xs,
   },
-  // FAB
+  extraAudioPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surfaceSecondary,
+    marginBottom: spacing.sm,
+  },
+  extraAudioText: {
+    fontSize: typography.sizes.xs,
+    fontFamily: fonts.medium,
+    color: colors.textSecondary,
+  },
+  // FAB — `bottom` is set inline using safe-area insets so it sits above
+  // gesture-nav home indicators on modern Android phones.
   fabContainer: {
     position: 'absolute',
-    bottom: 40,
     left: 0,
     right: 0,
     alignItems: 'center',

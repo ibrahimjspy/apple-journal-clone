@@ -8,20 +8,20 @@
 import { View, Image, Text, StyleSheet } from 'react-native';
 import { planImageGrid } from '@/utils/imageGrid';
 import { colors, borderRadius, fonts, typography } from '@/constants/theme';
+import {
+  CARD_IMAGE_GRID_GAP,
+  CARD_IMAGE_MULTI_HEIGHT,
+  CARD_IMAGE_SINGLE_ASPECT,
+} from '@/constants/app';
 
 interface CardImageGridProps {
   /** All preview image URIs for the entry. */
   images: string[];
 }
 
-/** Gap (px) between adjacent image cells in any layout. */
-const GAP = 2;
-
-/** Fixed total height (px) for multi-image layouts (single uses aspect ratio). */
-const MULTI_HEIGHT = 200;
-
-/** Aspect ratio (width / height) for single-image hero cells. */
-const SINGLE_ASPECT = 4 / 3;
+const GAP = CARD_IMAGE_GRID_GAP;
+const MULTI_HEIGHT = CARD_IMAGE_MULTI_HEIGHT;
+const SINGLE_ASPECT = CARD_IMAGE_SINGLE_ASPECT;
 
 /**
  * Adaptive grid that picks a layout based on image count.
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: colors.badge,
     justifyContent: 'center',
     alignItems: 'center',
   },
