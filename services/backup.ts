@@ -53,7 +53,7 @@ export function buildManifest(entries: readonly JournalEntry[], appVersion: stri
     appVersion,
     entries: entries.map(e => ({
       id: e.id,
-      folderName: buildEntryFolderName(e.title, e.createdAt),
+      folderName: buildEntryFolderName(e.title, e.createdAt, e.id),
     })),
   };
 }

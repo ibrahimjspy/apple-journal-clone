@@ -32,10 +32,25 @@ export function slugify(input: string): string {
 }
 
 /**
- * Builds an entry-folder name in the form `YYYY-MM-DD_slug` so backups
- * sort chronologically in the Android Files app.
+ * Builds an entry-folder name in the form `YYYY-MM-DD_slug__<suffix>`.
+ *
+ * Prefix is the calendar day so backups sort chronologically in the
+ * Android Files app. Suffix is a short stable token derived from the
+ * entry id, included to guarantee uniqueness when two entries on the
+ * same day share a title (or slug-collide via stripped characters).
+ * Without the suffix, the second export would overwrite the first.
  */
-export function buildEntryFolderName(title: string, isoDate: string): string {
+export function buildEntryFolderName(title: string, isoDate: string, entryId: string): string {
   const datePart = isoDate.slice(0, 10); // YYYY-MM-DD
-  return `${datePart}_${slugify(title)}`;
+  return `${datePart}_${slugify(title)}__${shortIdSuffix(entryId)}`;
+}
+
+/**
+ * Returns the last 6 characters of the entry id (the random portion of
+ * the generated id `${ts}-${rand}`). Long enough to disambiguate
+ * realistic collisions, short enough to keep folder names readable.
+ */
+function shortIdSuffix(entryId: string): string {
+  const tail = entryId.replace(/[^a-zA-Z0-9]/g, '');
+  return tail.slice(-6) || 'noid';
 }

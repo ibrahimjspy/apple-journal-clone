@@ -42,10 +42,12 @@ describe('buildManifest', () => {
     expect(manifest.appVersion).toBe('2.5.1');
   });
 
-  it('generates a folder name per entry', () => {
+  it('generates a folder name per entry that includes the id suffix for uniqueness', () => {
     const manifest = buildManifest([sampleEntry], '1.0.0');
     expect(manifest.entries).toHaveLength(1);
-    expect(manifest.entries[0].folderName).toBe('2026-05-28_hello-world');
+    // Format: YYYY-MM-DD_slug__<last 6 alphanumeric of id>
+    // sampleEntry.id is "entry-1" → alphanumeric "entry1" → suffix "entry1"
+    expect(manifest.entries[0].folderName).toBe('2026-05-28_hello-world__entry1');
   });
 
   it('sets exportedAt to a valid ISO timestamp', () => {

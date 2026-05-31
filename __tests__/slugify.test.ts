@@ -50,15 +50,30 @@ describe('slugify', () => {
 });
 
 describe('buildEntryFolderName', () => {
-  it('prefixes slug with YYYY-MM-DD from ISO date', () => {
-    expect(buildEntryFolderName('My Entry', '2026-05-28T14:30:00.000Z')).toBe('2026-05-28_my-entry');
+  it('prefixes slug with YYYY-MM-DD and appends short id suffix', () => {
+    // shortIdSuffix takes last 6 alphanumeric chars of the id
+    expect(
+      buildEntryFolderName('My Entry', '2026-05-28T14:30:00.000Z', '1738086600000-abc123x')
+    ).toBe('2026-05-28_my-entry__bc123x');
   });
 
-  it('uses "untitled" suffix when title is empty', () => {
-    expect(buildEntryFolderName('', '2026-05-28T00:00:00.000Z')).toBe('2026-05-28_untitled');
+  it('produces distinct folder names for entries that share title and day', () => {
+    const a = buildEntryFolderName('Same Title', '2026-05-28', '1-aaaaaa');
+    const b = buildEntryFolderName('Same Title', '2026-05-28', '2-bbbbbb');
+    expect(a).not.toBe(b);
+  });
+
+  it('uses "untitled" slug when title is empty but still includes suffix', () => {
+    const name = buildEntryFolderName('', '2026-05-28T00:00:00.000Z', '99-xyz999');
+    expect(name).toMatch(/^2026-05-28_untitled__/);
+    expect(name).not.toBe('2026-05-28_untitled');
   });
 
   it('handles ISO dates with only the date portion', () => {
-    expect(buildEntryFolderName('Test', '2026-01-01')).toBe('2026-01-01_test');
+    expect(buildEntryFolderName('Test', '2026-01-01', '5-qwerty')).toMatch(/^2026-01-01_test__/);
+  });
+
+  it('falls back to "noid" suffix when id is missing alphanumerics', () => {
+    expect(buildEntryFolderName('x', '2026-05-28', '----')).toBe('2026-05-28_x__noid');
   });
 });

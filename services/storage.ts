@@ -1,65 +1,85 @@
 /**
- * Local Storage Service using AsyncStorage
- * Handles journal entry CRUD with metadata stored in AsyncStorage.
- * Media files (images, audio) are persisted separately via services/media.ts.
+ * Local Storage Service using AsyncStorage.
+ *
+ * Persists journal entry metadata (id, title, content blocks, timestamps,
+ * previews) under a single AsyncStorage key. Media files (images, audio)
+ * referenced by content blocks live separately on the file system; see
+ * services/media.ts.
+ *
+ * Critical invariant: never return [] when the underlying data is corrupt,
+ * because a subsequent createEntry() would overwrite the user's journal
+ * with a single entry. Functions that read entries either return the
+ * real list, or throw — they never silently swallow corruption.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { JournalEntry, JournalEntryDraft, ContentBlock } from '@/types/journal';
 import { generateId } from '@/utils/id';
+import { PREVIEW_TEXT_MAX, PREVIEW_IMAGE_MAX } from '@/constants/app';
 import { deleteMediaFile } from './media';
-
-export { generateId };
 
 const STORAGE_KEYS = {
   ENTRIES: 'journal_entries',
-  DRAFT: 'journal_draft',
 } as const;
 
-/** Retrieves all entries from AsyncStorage, sorted newest-first. Returns [] on failure. */
-export async function getEntries(): Promise<JournalEntry[]> {
-  try {
-    const data = await AsyncStorage.getItem(STORAGE_KEYS.ENTRIES);
-    if (!data) return [];
-    
-    const entries: JournalEntry[] = JSON.parse(data);
-    // Sort by date, newest first
-    return entries.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  } catch (error) {
-    console.error('Error getting entries:', error);
-    return [];
+/** Thrown when AsyncStorage contains data we cannot parse. Callers must NOT silently fall back to [] on this — that would risk overwriting the user's journal. */
+export class CorruptStorageError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = 'CorruptStorageError';
   }
 }
 
-/** Persists a new entry, computes preview fields, and clears any saved draft. Throws on failure. */
-export async function createEntry(draft: JournalEntryDraft): Promise<JournalEntry> {
-  try {
-    const now = new Date().toISOString();
-    
-    const entry: JournalEntry = {
-      ...draft,
-      id: generateId(),
-      createdAt: now,
-      updatedAt: now,
-      previewText: extractPreviewText(draft.content),
-      previewImages: extractPreviewImages(draft.content),
-      hasAudio: draft.content.some(block => block.type === 'audio'),
-    };
+/**
+ * Retrieves all entries from AsyncStorage, sorted newest-first.
+ *
+ * Returns `[]` only when storage is genuinely empty. Throws
+ * `CorruptStorageError` when the stored JSON is unreadable, so callers
+ * can refuse to perform destructive writes against a corrupted store.
+ */
+export async function getEntries(): Promise<JournalEntry[]> {
+  const data = await AsyncStorage.getItem(STORAGE_KEYS.ENTRIES);
+  if (!data) return [];
 
-    const entries = await getEntries();
-    entries.unshift(entry);
-    
-    await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
-    
-    await clearDraft();
-    
-    return entry;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
   } catch (error) {
-    console.error('Error creating entry:', error);
-    throw error;
+    throw new CorruptStorageError(
+      'journal_entries contains invalid JSON; refusing to read to avoid data loss',
+      error
+    );
   }
+  if (!Array.isArray(parsed)) {
+    throw new CorruptStorageError('journal_entries is not an array');
+  }
+
+  return (parsed as JournalEntry[]).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+/**
+ * Persists a new entry, computes preview fields, and returns it.
+ * Throws on storage failure OR on corrupted existing data (we don't
+ * overwrite a journal we can't read).
+ */
+export async function createEntry(draft: JournalEntryDraft): Promise<JournalEntry> {
+  const now = new Date().toISOString();
+  const entry: JournalEntry = {
+    ...draft,
+    id: generateId(),
+    createdAt: now,
+    updatedAt: now,
+    previewText: extractPreviewText(draft.content),
+    previewImages: extractPreviewImages(draft.content),
+    hasAudio: draft.content.some(block => block.type === 'audio'),
+  };
+
+  const entries = await getEntries(); // may throw CorruptStorageError — caller surfaces
+  entries.unshift(entry);
+  await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
+  return entry;
 }
 
 /** Applies partial updates to an entry. Recomputes previews if content changed. Returns null if not found. */
@@ -142,71 +162,95 @@ export async function mergeEntries(incoming: JournalEntry[]): Promise<{ added: n
   }
 }
 
-/** Deletes an entry and its associated media files from local storage. */
+/**
+ * Deletes an entry and best-effort cleans up its media files.
+ *
+ * Order matters: we persist the new entry list FIRST, then delete media.
+ * If we did it the other way and the AsyncStorage write failed, the
+ * entry would still exist but reference deleted files (broken thumbnails,
+ * unplayable audio). Media-delete failures after a successful storage
+ * write only leave orphan files on disk, which is harmless and recoverable.
+ *
+ * Returns:
+ *   true  — entry was present and removed
+ *   false — entry id not found, OR storage write failed
+ */
 export async function deleteEntry(id: string): Promise<boolean> {
+  let entries: JournalEntry[];
   try {
-    const entries = await getEntries();
-    const entry = entries.find(e => e.id === id);
-    
-    if (entry) {
-      const mediaUris: string[] = [];
-      for (const block of entry.content) {
-        if (block.type === 'image' && block.content) mediaUris.push(block.content);
-        if (block.type === 'audio' && block.content) mediaUris.push(block.content);
-      }
-      await Promise.all(mediaUris.map(uri => deleteMediaFile(uri)));
-    }
-    
-    const filtered = entries.filter(e => e.id !== id);
-    await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(filtered));
-    return true;
+    entries = await getEntries();
   } catch (error) {
-    console.error('Error deleting entry:', error);
+    console.error('Error deleting entry: cannot read storage', error);
     return false;
   }
-}
 
-async function clearDraft(): Promise<void> {
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return false;
+
+  const filtered = entries.filter(e => e.id !== id);
   try {
-    await AsyncStorage.removeItem(STORAGE_KEYS.DRAFT);
+    await AsyncStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(filtered));
   } catch (error) {
-    console.error('Error clearing draft:', error);
+    console.error('Error deleting entry: storage write failed', error);
+    return false;
   }
+
+  // Storage is authoritative; media cleanup is best-effort.
+  const mediaUris: string[] = [];
+  for (const block of entry.content) {
+    if ((block.type === 'image' || block.type === 'audio') && block.content) {
+      mediaUris.push(block.content);
+    }
+  }
+  await Promise.all(mediaUris.map(uri => deleteMediaFile(uri)));
+  return true;
 }
 
-// Helper: Extract preview text from content blocks
+/** Extract the first PREVIEW_TEXT_MAX characters of text content for list previews. */
 function extractPreviewText(content: ContentBlock[]): string {
   const textBlocks = content.filter(block => block.type === 'text');
   const text = textBlocks.map(block => block.content).join(' ');
-  return text.slice(0, 200); // First 200 chars
+  return text.slice(0, PREVIEW_TEXT_MAX);
 }
 
-// Helper: Extract preview images from content blocks
+/** Extract up to PREVIEW_IMAGE_MAX image URIs for the card thumbnail grid. */
 function extractPreviewImages(content: ContentBlock[]): string[] {
   return content
     .filter(block => block.type === 'image')
     .map(block => block.content)
-    .slice(0, 6); // Max 6 preview images
+    .slice(0, PREVIEW_IMAGE_MAX);
 }
 
-/** Formats an ISO date string for display: "Today", "Yesterday", weekday, or "Weekday, Mon DD". */
+/**
+ * Formats an ISO date string for display: "Today", "Yesterday", a weekday
+ * for the past week, or "Weekday, Mon DD" for older dates.
+ *
+ * Uses CALENDAR-day diffs (not elapsed hours) so an entry written at
+ * 11pm and viewed at 1am the next day correctly shows "Yesterday" rather
+ * than "Today".
+ */
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) {
-    return 'Today';
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
+
+  const diffDays = calendarDaysBetween(date, now);
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) {
     return date.toLocaleDateString('en-US', { weekday: 'long' });
-  } else {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      month: 'short', 
-      day: 'numeric' 
-    });
   }
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/** Number of whole calendar days between two dates, in the local timezone. */
+function calendarDaysBetween(earlier: Date, later: Date): number {
+  const a = new Date(earlier.getFullYear(), earlier.getMonth(), earlier.getDate()).getTime();
+  const b = new Date(later.getFullYear(), later.getMonth(), later.getDate()).getTime();
+  return Math.round((b - a) / 86_400_000);
 }
 

@@ -17,7 +17,9 @@ import {
   deleteEntry,
   toggleBookmark,
   formatDate,
+  CorruptStorageError,
 } from '../services/storage';
+import { deleteMediaFile } from '../services/media';
 
 const mockedStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 
@@ -43,14 +45,26 @@ describe('getEntries', () => {
     expect(entries[1].id).toBe('1');
   });
 
-  it('returns empty array on parse error', async () => {
+  it('throws CorruptStorageError on invalid JSON (refuses to silently return [] which would risk overwrite)', async () => {
     mockedStorage.getItem.mockResolvedValue('not-json');
-    const entries = await getEntries();
-    expect(entries).toEqual([]);
+    await expect(getEntries()).rejects.toBeInstanceOf(CorruptStorageError);
+  });
+
+  it('throws CorruptStorageError when stored data is not an array', async () => {
+    mockedStorage.getItem.mockResolvedValue('{"oops": true}');
+    await expect(getEntries()).rejects.toBeInstanceOf(CorruptStorageError);
   });
 });
 
 describe('createEntry', () => {
+  it('refuses to write when existing storage is corrupt (prevents data loss)', async () => {
+    mockedStorage.getItem.mockResolvedValue('not-json');
+    await expect(
+      createEntry({ title: 'New', content: [{ id: 'b1', type: 'text', content: 'x' }] })
+    ).rejects.toBeInstanceOf(CorruptStorageError);
+    expect(mockedStorage.setItem).not.toHaveBeenCalled();
+  });
+
   it('saves entry with generated id and timestamps', async () => {
     mockedStorage.getItem.mockResolvedValue(JSON.stringify([]));
     mockedStorage.setItem.mockResolvedValue(undefined);
@@ -165,7 +179,7 @@ describe('toggleBookmark', () => {
 });
 
 describe('deleteEntry', () => {
-  it('removes entry from storage', async () => {
+  it('removes entry from storage and returns true', async () => {
     const existing = [
       { id: '1', content: [], createdAt: '2024-01-01T00:00:00Z' },
       { id: '2', content: [], createdAt: '2024-02-01T00:00:00Z' },
@@ -179,6 +193,36 @@ describe('deleteEntry', () => {
     const savedData = JSON.parse(mockedStorage.setItem.mock.calls[0][1] as string);
     expect(savedData).toHaveLength(1);
     expect(savedData[0].id).toBe('2');
+  });
+
+  it('returns false when the id does not exist (no storage write)', async () => {
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify([]));
+    const result = await deleteEntry('missing');
+    expect(result).toBe(false);
+    expect(mockedStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('writes storage BEFORE attempting media cleanup (no broken-reference window)', async () => {
+    const callOrder: string[] = [];
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify([
+      { id: '1', content: [{ type: 'image', content: 'file:///x.jpg' }], createdAt: '2024-01-01T00:00:00Z' },
+    ]));
+    mockedStorage.setItem.mockImplementation(async () => { callOrder.push('setItem'); });
+    (deleteMediaFile as jest.Mock).mockImplementation(async () => { callOrder.push('deleteMedia'); });
+
+    await deleteEntry('1');
+    expect(callOrder).toEqual(['setItem', 'deleteMedia']);
+  });
+
+  it('returns false when storage write fails (does not delete media)', async () => {
+    mockedStorage.getItem.mockResolvedValue(JSON.stringify([
+      { id: '1', content: [{ type: 'image', content: 'file:///x.jpg' }], createdAt: '2024-01-01T00:00:00Z' },
+    ]));
+    mockedStorage.setItem.mockRejectedValue(new Error('disk full'));
+
+    const result = await deleteEntry('1');
+    expect(result).toBe(false);
+    expect(deleteMediaFile).not.toHaveBeenCalled();
   });
 });
 
